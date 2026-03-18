@@ -1,0 +1,101 @@
+import {
+  RiMoneyDollarCircleLine,
+  RiListCheck3,
+  RiUserLine,
+  RiTicketLine,
+  RiLayoutGridLine,
+  RiSettings2Line,
+  RiBuildingLine,
+  RiBox3Line,
+  RiUser2Line,
+  RiCalendarLine,
+  RiTeamLine,
+  RiInboxLine,
+} from 'react-icons/ri';
+
+export const sidebar = {
+  Bookings: {
+    icon: <RiCalendarLine size={20} />,
+    label: 'Bookings',
+    tooltipContent: 'Bookings',
+    path: '/bookings',
+  },
+  'Seat Inventory': {
+    icon: <RiListCheck3 size={20} />,
+    label: 'Seats Inventory',
+    tooltipContent: 'Seats Inventory',
+    path: '/seats',
+  },
+  Clients: {
+    icon: <RiUserLine size={20} />,
+    label: 'Clients',
+    tooltipContent: 'Clients',
+    path: '/clients',
+  },
+  VMS: {
+    icon: <RiUserLine size={20} />,
+    label: 'VMS',
+    tooltipContent: 'VMS',
+    path: '/vms',
+  },
+  Collections: {
+    icon: <RiUserLine size={20} />,
+    label: 'Collections',
+    tooltipContent: 'Collections',
+    path: '/collections',
+  },
+  'Ticket Management': {
+    icon: <RiTicketLine size={20} />,
+    label: 'Ticket Management',
+    tooltipContent: 'Ticket Management',
+    path: '/ticket-management',
+  },
+  Dashboard: {
+    icon: <RiLayoutGridLine size={20} />,
+    label: 'Dashboard',
+    tooltipContent: 'Dashboard',
+    path: '/dashboard',
+  },
+  'Support Tickets': {
+    icon: <RiTicketLine size={20} />,
+    label: 'Support Tickets',
+    tooltipContent: 'Support Tickets',
+    path: '/support-tickets',
+  },
+  Landlords: {
+    icon: <RiUser2Line size={20} />,
+    label: 'Landlords',
+    tooltipContent: 'Landlords',
+    path: '/landlords',
+  },
+  Settings: {
+    icon: <RiSettings2Line size={20} />,
+    label: 'Settings',
+    tooltipContent: 'Settings',
+    path: '/settings',
+  },
+  Centers: {
+    icon: <RiBuildingLine size={20} />,
+    label: 'Centers',
+    tooltipContent: 'Centers',
+    path: '/centers',
+  },
+  Spaces: {
+    icon: <RiBox3Line size={20} />,
+    label: 'Spaces',
+    tooltipContent: 'Spaces',
+    path: '/spaces',
+  },
+  'Team Management': {
+    icon: <RiTeamLine size={20} />,
+    label: 'Team Management',
+    tooltipContent: 'Team Management',
+    path: '/team-management',
+  },
+  Inbox: {
+    icon: <RiInboxLine size={20} />,
+    label: 'Inbox',
+    tooltipContent: 'Inbox',
+    path: '/inbox',
+  },
+};
