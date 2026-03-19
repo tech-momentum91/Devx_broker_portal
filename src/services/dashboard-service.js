@@ -738,3 +738,81 @@ export async function getLeadById(leadName) {
     throw new Error(serializeError(error));
   }
 }
+
+// ---------------------------------------------------------------------------
+// Lead activities (comments / conversation) – API: get_lead_activities, add_lead_comment
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetches comments and activity history for a lead. API: devx.api.lead.get_lead_activities
+ * @param {string} leadName - Lead doc name
+ * @returns {Promise<{ comments: Array<{ name, content, owner, creation, from: 'Partner'|'Team' }>, history: Array }>}
+ */
+export async function getLeadActivities(leadName) {
+  const id = leadName && String(leadName).trim();
+  if (!id) throw new Error('Lead ID is required');
+
+  try {
+    const res = await apiClient.get('/method/devx.api.lead.get_lead_activities', {
+      params: { lead_name: id },
+    });
+    let body = res?.data;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        body = null;
+      }
+    }
+    if (body?.exc) throw new Error(body.message || body.exc);
+    const json = body && (body.message !== undefined ? body.message : body);
+    return {
+      comments: Array.isArray(json?.comments) ? json.comments : [],
+      history: Array.isArray(json?.history) ? json.history : [],
+    };
+  } catch (error) {
+    throw new Error(serializeError(error));
+  }
+}
+
+/**
+ * Adds a comment to a lead (broker message). API: devx.api.lead.add_lead_comment
+ * @param {string} leadName - Lead doc name
+ * @param {string} content - Comment text
+ * @returns {Promise<{ name: string, message: string }>}
+ */
+export async function addLeadComment(leadName, content, attachments = []) {
+  const id = leadName && String(leadName).trim();
+  const text = content != null ? String(content).trim() : '';
+  if (!id) throw new Error('Lead ID is required');
+  if (!text) throw new Error('Comment cannot be empty');
+
+  try {
+    const hasFiles = Array.isArray(attachments) && attachments.length > 0;
+    const payload = hasFiles ? new FormData() : { lead_name: id, content: text };
+    if (hasFiles) {
+      payload.append('lead_name', id);
+      payload.append('content', text);
+      attachments.forEach((att) => {
+        if (att?.file instanceof File) {
+          payload.append('attachments', att.file, att.name || att.file.name);
+        }
+      });
+    }
+
+    const res = await apiClient.post('/method/devx.api.lead.add_lead_comment', payload);
+    let data = res?.data;
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        data = null;
+      }
+    }
+    if (data?.exc) throw new Error(data.message || data.exc);
+    const out = data?.message ?? data;
+    return { name: out?.name, message: out?.message ?? 'Comment added' };
+  } catch (error) {
+    throw new Error(serializeError(error));
+  }
+}

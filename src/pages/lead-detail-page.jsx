@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   RiArrowLeftSLine,
   RiStackLine,
@@ -23,7 +24,14 @@ import {
 import PageLayout from '@/components/page-layout';
 import LeadStatusBadge from '@/components/dashboard/lead-status-badge';
 import LeadProgressBar, { getCurrentStageIndex } from '@/components/dashboard/lead-progress-bar';
-import { getLeadById, getCrmStagesForExternal } from '@/services/dashboard-service';
+import CommentInput from '@/components/ui/comment-input';
+import CommentAttachment from '@/components/ui/comment-attachment';
+import {
+  getLeadById,
+  getCrmStagesForExternal,
+  getLeadActivities,
+  addLeadComment,
+} from '@/services/dashboard-service';
 
 const STATUS_STEP_INDEX = {
   lead_submitted: 1,
@@ -267,32 +275,39 @@ function CommissionCard({ lead }) {
   );
 }
 
-const SAMPLE_CONVERSATION = [
-  {
-    from: 'Partner',
-    text: 'Client wants to close before quarter end and is keen on the shortlisted options.',
-    time: 'Feb 21 · 4:12 PM',
-  },
-  {
-    from: 'Team',
-    text: 'Shared availability for site visits this week. Awaiting final confirmation from client side.',
-    time: 'Feb 21 · 5:45 PM',
-  },
-  {
-    from: 'Partner',
-    text: 'Confirmed. Their leadership team will join the next discussion.',
-    time: 'Feb 22 · 9:30 AM',
-  },
-];
-
 const LeadDetailPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const profileEmail = useSelector((state) => state?.profile?.profileData?.email);
+  const authEmail = useSelector((state) => state?.auth?.userInfo?.email);
+  const currentUserEmail = (profileEmail || authEmail || '').toLowerCase();
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [note, setNote] = useState('');
   const [crmStages, setCrmStages] = useState([]);
+  const [activities, setActivities] = useState({ comments: [], history: [] });
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [sendLoading, setSendLoading] = useState(false);
+  const sanitizeHtml = (html) => {
+    const safeHtml = html != null ? String(html) : '';
+    return safeHtml
+      .replaceAll(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replaceAll(/javascript:/gi, '');
+  };
+
+  const mentionsCurrentBroker = (html) => {
+    if (!currentUserEmail) return false;
+    const s = html != null ? String(html) : '';
+    // TipTap mention markup: <span ... data-mention="true" data-id="email">...</span>
+    const regex = /data-mention=["']true["'][^>]*data-id=["']([^"']+)["']/gi;
+    let match;
+    while ((match = regex.exec(s))) {
+      const mentioned = String(match[1] || '').toLowerCase();
+      if (mentioned && mentioned === currentUserEmail) return true;
+    }
+    // Fallback: plain "@email" mention
+    return s.toLowerCase().includes(`@${currentUserEmail}`);
+  };
 
   useEffect(() => {
     if (!id) {
@@ -325,6 +340,49 @@ const LeadDetailPage = () => {
       cancelled = true;
     };
   }, [id]);
+
+  // Load activities (comments / conversation) when lead is available
+  useEffect(() => {
+    if (!id || !detail) {
+      setActivities({ comments: [], history: [] });
+      return;
+    }
+    let cancelled = false;
+    setActivitiesLoading(true);
+    getLeadActivities(id)
+      .then((data) => {
+        if (!cancelled) {
+          setActivities({
+            comments: data.comments ?? [],
+            history: data.history ?? [],
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setActivities({ comments: [], history: [] });
+      })
+      .finally(() => {
+        if (!cancelled) setActivitiesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, detail?.id]);
+
+  const handleSubmitComment = async (content, attachments) => {
+    if (!id || sendLoading) return;
+    setSendLoading(true);
+    try {
+      await addLeadComment(id, content, attachments);
+      const data = await getLeadActivities(id);
+      setActivities({
+        comments: data.comments ?? [],
+        history: data.history ?? [],
+      });
+    } finally {
+      setSendLoading(false);
+    }
+  };
 
   const rawStatus = detail?.status ?? '';
   const normalizedStatus = String(rawStatus).toLowerCase().replace(/\s+/g, '_');
@@ -420,6 +478,13 @@ const LeadDetailPage = () => {
     sortedStages.length > 0
       ? getCurrentStageIndex(sortedStages, leadStatusForStepper)
       : -1;
+
+  const visibleComments = (activities.comments ?? []).filter((msg) => {
+    const from = String(msg?.from ?? '');
+    if (from === 'Partner') return true;
+    // Only show team replies that explicitly @mention this broker
+    return mentionsCurrentBroker(msg?.content);
+  });
 
   return (
     <PageLayout>
@@ -634,77 +699,6 @@ const LeadDetailPage = () => {
             )}
 
             <div className="rounded-xl border border-stroke-soft-200 bg-bg-white-0 p-6 shadow-[var(--shadow-custom-xs)]">
-              <h2 className="text-label-lg font-semibold text-text-main-900">Conversation</h2>
-              <div className="mt-4 space-y-4">
-                {SAMPLE_CONVERSATION.map((msg, index) => {
-                  const isPartner = msg.from === 'Partner';
-                  return (
-                    <div
-                      key={index}
-                      className={[
-                        'flex gap-3',
-                        isPartner ? 'flex-row-reverse' : '',
-                      ].join(' ')}
-                    >
-                      <div
-                        className={[
-                          'flex size-7 shrink-0 items-center justify-center rounded-full text-label-xs font-semibold',
-                          isPartner
-                            ? 'bg-success-soft-100 text-success-darker'
-                            : 'bg-bg-soft-200 text-text-sub-500',
-                        ].join(' ')}
-                      >
-                        {msg.from.charAt(0)}
-                      </div>
-                      <div
-                        className={[
-                          'flex max-w-[75%] flex-col gap-1',
-                          isPartner ? 'items-end' : 'items-start',
-                        ].join(' ')}
-                      >
-                        <div
-                          className={[
-                            'rounded-2xl px-4 py-3 text-paragraph-sm leading-relaxed',
-                            isPartner
-                              ? 'rounded-tr-sm bg-success-soft-50 text-success-darker'
-                              : 'rounded-tl-sm bg-bg-soft-100 text-text-main-900',
-                          ].join(' ')}
-                        >
-                          {msg.text}
-                        </div>
-                        <span className="px-1 text-label-xs text-text-soft-400">
-                          {msg.time}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-5 flex gap-3 border-t border-stroke-soft-100 pt-4">
-                <input
-                  type="text"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Add a note or update…"
-                  className="flex-1 rounded-lg border border-stroke-soft-200 bg-bg-soft-100 px-3 py-2 text-paragraph-sm text-text-main-900 outline-none focus:border-success-soft-400 focus:ring-1 focus:ring-success-soft-300 placeholder:text-text-soft-400"
-                />
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-lg bg-success-base px-4 py-2 text-label-sm font-semibold text-static-white hover:bg-success-dark focus:outline-none focus:ring-2 focus:ring-success-soft-300"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-5">
-            {isWon && <DealWonCard lead={detail} />}
-            {isDesignBuild && <MilestoneBonusCard lead={detail} />}
-            {isDesignBuild && !isTerminal && <EarningsPotentialCard lead={detail} />}
-            {showCommission && <CommissionCard lead={detail} />}
-
-            <div className="rounded-xl border border-stroke-soft-200 bg-bg-white-0 p-6 shadow-[var(--shadow-custom-xs)]">
               <h2 className="text-label-lg font-bold text-text-main-900">Project Specs</h2>
               <dl className="mt-4 space-y-3 text-paragraph-sm">
                 <div className="flex items-center justify-between gap-6">
@@ -754,6 +748,111 @@ const LeadDetailPage = () => {
                   <dd className="text-text-main-900">{timeline}</dd>
                 </div>
               </dl>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-5 min-h-0">
+            {isWon && <DealWonCard lead={detail} />}
+            {isDesignBuild && <MilestoneBonusCard lead={detail} />}
+            {isDesignBuild && !isTerminal && <EarningsPotentialCard lead={detail} />}
+            {showCommission && <CommissionCard lead={detail} />}
+
+            <div className="flex h-[520px] flex-col overflow-hidden rounded-xl border border-stroke-soft-200 bg-bg-white-0 p-6 shadow-[var(--shadow-custom-xs)]">
+              <h2 className="text-label-lg font-semibold text-text-main-900">Conversation</h2>
+              <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+                {activitiesLoading ? (
+                  <div className="py-8 text-center text-paragraph-sm text-text-sub-500">
+                    Loading conversation…
+                  </div>
+                ) : visibleComments.length === 0 ? (
+                  <div className="py-8 text-center text-paragraph-sm text-text-sub-500">
+                    No messages yet. Add a note below to start the conversation.
+                  </div>
+                ) : (
+                  visibleComments.map((msg) => {
+                    const isPartner = msg.from === 'Partner';
+                    const timeStr =
+                      msg.creation &&
+                      (() => {
+                        try {
+                          const d = new Date(msg.creation);
+                          return Number.isNaN(d.getTime())
+                            ? ''
+                            : d.toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              });
+                        } catch {
+                          return '';
+                        }
+                      })();
+
+                    return (
+                      <div
+                        key={msg.name || msg.creation}
+                        className={['flex gap-3', isPartner ? 'flex-row-reverse' : ''].join(' ')}
+                      >
+                        <div
+                          className={[
+                            'flex size-7 shrink-0 items-center justify-center rounded-full text-label-xs font-semibold',
+                            isPartner
+                              ? 'bg-success-soft-100 text-success-darker'
+                              : 'bg-bg-soft-200 text-text-sub-500',
+                          ].join(' ')}
+                        >
+                          {msg.from?.charAt(0) ?? 'T'}
+                        </div>
+                        <div
+                          className={[
+                            'flex w-full min-w-0 max-w-[75%] flex-col gap-1',
+                            isPartner ? 'items-end' : 'items-start',
+                          ].join(' ')}
+                        >
+                          <div
+                            className={[
+                              'rounded-2xl px-4 py-3 text-paragraph-sm leading-relaxed',
+                              isPartner
+                                ? 'rounded-tr-sm bg-success-soft-50 text-success-darker'
+                                : 'rounded-tl-sm bg-bg-soft-100 text-text-main-900',
+                            ].join(' ')}
+                          >
+                            <div
+                              className="[&>p]:mb-0 [&>p:last-child]:mb-0"
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(msg.content || '') }}
+                            />
+                            {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                              <div className="mt-3 w-full min-w-0 max-w-full">
+                                <div className="max-h-64 w-full min-w-0 max-w-full space-y-2 overflow-y-auto pr-1">
+                                  {msg.attachments.map((attachment, index) => (
+                                    <div key={attachment?.id ?? attachment?.name ?? attachment?.file ?? index}>
+                                      <CommentAttachment attachment={attachment} />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {timeStr && (
+                            <span className="px-1 text-label-xs text-text-soft-400">
+                              {timeStr}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <div className="mt-5 border-t border-stroke-soft-100 pt-4">
+                <CommentInput
+                  onSubmit={handleSubmitComment}
+                  isSubmitting={sendLoading}
+                  placeholder="Add a comment…"
+                  showVisibleToClient={false}
+                />
+              </div>
             </div>
           </div>
         </div>
