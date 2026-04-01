@@ -19,7 +19,7 @@ import apiClient from '@/api/axios';
  */
 export async function submitLeadFromBrokerPortal(payload) {
   const response = await apiClient.post(
-    '/method/devx.api.lead.create_lead_from_broker_portal',
+    '/method/devx.channel_partner.api.lead.create_lead_from_broker_portal',
     payload,
   );
   const data = response?.data;

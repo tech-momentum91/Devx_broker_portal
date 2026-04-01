@@ -49,7 +49,7 @@ function mapSummaryToCounts(summary) {
  * Returns summary counts for Managed Office and Design & Build for the logged-in CP contact.
  */
 async function fetchBrokerDashboardSummaryFromApi() {
-  const res = await apiClient.get('/method/devx.api.lead.get_leads_for_cp_contact');
+  const res = await apiClient.get('/method/devx.channel_partner.api.lead.get_leads_for_cp_contact');
   let body = res?.data;
   if (typeof body === 'string') {
     try {

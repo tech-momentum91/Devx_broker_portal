@@ -42,7 +42,7 @@ function normalizeRecentSubmission(raw) {
 
 async function fetchRecentSubmissionsFromApi({ limit = 7 } = {}) {
   // CP contact leads API (backend filters by logged-in CP contact user).
-  const res = await apiClient.get('/method/devx.api.lead.get_leads_for_cp_contact', {
+  const res = await apiClient.get('/method/devx.channel_partner.api.lead.get_leads_for_cp_contact', {
     params: { limit },
   });
 

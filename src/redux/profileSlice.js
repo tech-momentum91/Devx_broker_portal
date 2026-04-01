@@ -207,7 +207,7 @@ export const getCpContactProfile = createAsyncThunk(
   'profile/getCpContactProfile',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get('/method/devx.api.channel_partner.get_my_cp_contact', {
+      const response = await apiClient.get('/method/devx.channel_partner.api.channel_partner.get_my_cp_contact', {
         withCredentials: true,
       });
       const body = response?.data;

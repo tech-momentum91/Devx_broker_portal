@@ -426,7 +426,7 @@ async function fetchStatusOptionsFromApi() {
  * City options – same source as devx_frontend create-new-cp-contact-modal (dynamic from API).
  * Uses get_cp_contact_filter_options only; backend has no get_city_options.
  */
-const CP_CONTACT_FILTER_OPTIONS_API = '/method/devx.api.channel_partner.get_cp_contact_filter_options';
+const CP_CONTACT_FILTER_OPTIONS_API = '/method/devx.channel_partner.api.channel_partner.get_cp_contact_filter_options';
 
 function normalizeCityOption(item) {
   if (typeof item === 'string')
@@ -489,7 +489,7 @@ function mapApiSummaryToCounts(summary) {
 }
 
 /**
- * Fetch lead submissions from API: devx.api.lead.get_leads_for_cp_contact
+ * Fetch lead submissions from API: devx.channel_partner.api.lead.get_leads_for_cp_contact
  * Returns leads where custom_cp_contact_user = logged-in user, filtered by tab (custom_service_type) and optional status/city.
  * Also returns summary counts for Managed Office and Design & Build dashboard cards when API includes summary.
  * @param {{ tab: string, filters: { status?: string[], city?: string[] } }} params
@@ -503,7 +503,7 @@ async function fetchLeadSubmissionsFromApi({ tab = 'managed', filters = {} } = {
   if (Array.isArray(filters.city) && filters.city.length)
     params.city = filters.city.join(',');
 
-  const res = await apiClient.get('/method/devx.api.lead.get_leads_for_cp_contact', {
+  const res = await apiClient.get('/method/devx.channel_partner.api.lead.get_leads_for_cp_contact', {
     params,
   });
   let body = res?.data;
@@ -702,7 +702,7 @@ export function normalizeLeadDetail(raw) {
 }
 
 /**
- * Fetches full lead details by id (Lead name). API: devx.api.lead.get_lead_by_id
+ * Fetches full lead details by id (Lead name). API: devx.channel_partner.api.lead.get_lead_by_id
  * @param {string} leadName - Lead doc name (e.g. CRM-LEAD-2026-00002)
  * @returns {Promise<object>} Normalized lead detail for UI
  */
@@ -720,7 +720,7 @@ export async function getLeadById(leadName) {
   }
 
   try {
-    const res = await apiClient.get('/method/devx.api.lead.get_lead_by_id', {
+    const res = await apiClient.get('/method/devx.channel_partner.api.lead.get_lead_by_id', {
       params: { lead_name: id },
     });
     let body = res?.data;
@@ -744,7 +744,7 @@ export async function getLeadById(leadName) {
 // ---------------------------------------------------------------------------
 
 /**
- * Fetches comments and activity history for a lead. API: devx.api.lead.get_lead_activities
+ * Fetches comments and activity history for a lead. API: devx.channel_partner.api.lead.get_lead_activities
  * @param {string} leadName - Lead doc name
  * @returns {Promise<{ comments: Array<{ name, content, owner, creation, from: 'Partner'|'Team' }>, history: Array }>}
  */
@@ -753,7 +753,7 @@ export async function getLeadActivities(leadName) {
   if (!id) throw new Error('Lead ID is required');
 
   try {
-    const res = await apiClient.get('/method/devx.api.lead.get_lead_activities', {
+    const res = await apiClient.get('/method/devx.channel_partner.api.lead.get_lead_activities', {
       params: { lead_name: id },
     });
     let body = res?.data;
@@ -776,7 +776,7 @@ export async function getLeadActivities(leadName) {
 }
 
 /**
- * Adds a comment to a lead (broker message). API: devx.api.lead.add_lead_comment
+ * Adds a comment to a lead (broker message). API: devx.channel_partner.api.lead.add_lead_comment
  * @param {string} leadName - Lead doc name
  * @param {string} content - Comment text
  * @returns {Promise<{ name: string, message: string }>}
@@ -800,7 +800,7 @@ export async function addLeadComment(leadName, content, attachments = []) {
       });
     }
 
-    const res = await apiClient.post('/method/devx.api.lead.add_lead_comment', payload);
+    const res = await apiClient.post('/method/devx.channel_partner.api.lead.add_lead_comment', payload);
     let data = res?.data;
     if (typeof data === 'string') {
       try {
