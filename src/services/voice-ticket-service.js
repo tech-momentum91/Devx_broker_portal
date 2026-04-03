@@ -11,12 +11,15 @@ class VoiceTicketService {
 
     formData.append('audio', audioBlob, 'voice-note.webm');
 
-    const response = await apiClient.post(
+    const response = await fetch(
       'https://95b7-27-109-18-82.ngrok-free.app/broker/extract-from-audio',
-      formData,
+      {
+        method: 'POST',
+        body: formData,
+      }
     );
 
-    return response.data;
+    return await response.json();
   }
 }
 
