@@ -69,7 +69,7 @@ function FieldGroup({ label, required, optional, children, className = '' }) {
   );
 }
 
-const ManagedOfficeLeadForm = () => {
+const ManagedOfficeLeadForm = ({ initialData = null }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const submitStatus = useSelector(selectLeadSubmitStatus);
@@ -96,6 +96,23 @@ const ManagedOfficeLeadForm = () => {
   useEffect(() => {
     if (workspaceType !== 'coworking') setProductType('');
   }, [workspaceType]);
+
+  useEffect(() => {
+    if (!initialData || typeof initialData !== 'object') return;
+
+    setWorkspaceType(initialData.workspaceType ?? initialData.workspace_type ?? '');
+    setProductType(initialData.productType ?? initialData.product_type ?? '');
+    setSeats(String(initialData.seats ?? initialData.no_of_seats ?? ''));
+    setMicroMarket(initialData.microMarket ?? initialData.micro_market ?? '');
+    setArea(initialData.area ?? '');
+    setTimeline(initialData.timeline ?? initialData.expected_decision_timeline ?? '');
+    setClientCompany(initialData.clientCompany ?? initialData.client_company ?? '');
+    setContactPerson(initialData.contactPerson ?? initialData.contact_person ?? '');
+    setPhone(initialData.phone ?? initialData.mobile_number ?? '');
+    setEmail(initialData.email ?? initialData.email_id ?? '');
+    setCity(initialData.city ?? '');
+    setRequirementSummary(initialData.requirementSummary ?? initialData.requirement_summary ?? '');
+  }, [initialData]);
 
   useEffect(() => {
     let cancelled = false;

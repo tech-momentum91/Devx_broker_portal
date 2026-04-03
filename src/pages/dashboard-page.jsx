@@ -6,6 +6,7 @@ import PageLayout from '@/components/page-layout';
 import * as Button from '@/components/ui/button';
 import DashboardStatusTabs from '@/components/dashboard-status-tabs';
 import { LeadSubmissionCard } from '@/components/dashboard';
+import VoiceModal from '@/components/submit-lead/voice-modal';
 import { getDefaultDashboardFilterLocalFilters } from '@/constants/dashboard-filter-constants';
 import {
   fetchLeadSubmissions,
@@ -13,7 +14,7 @@ import {
   selectSubmissions,
   selectExternalCrmStages,
 } from '@/redux/dashboardSlice';
-import { RiArrowRightSLine, RiStackLine } from 'react-icons/ri';
+import { RiArrowRightSLine, RiMicLine, RiStackLine } from 'react-icons/ri';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ const Dashboard = () => {
   const submissions = useSelector(selectSubmissions);
   const externalCrmStages = useSelector(selectExternalCrmStages);
   const [activeTab, setActiveTab] = useState('managed');
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState(() =>
     getDefaultDashboardFilterLocalFilters({}),
   );
@@ -64,9 +66,15 @@ const Dashboard = () => {
       pageDescription="All your submitted leads will be displayed here."
       headerActions={
         <div className="flex items-center gap-3">
-          {/* <Button.Root variant="neutral" mode="ghost" size="medium" aria-label="Voice">
+          <Button.Root
+            variant="neutral"
+            mode="ghost"
+            size="medium"
+            aria-label="Voice"
+            onClick={() => setIsVoiceModalOpen(true)}
+          >
             <Button.Icon as={RiMicLine} />
-          </Button.Root> */}
+          </Button.Root>
 
           <Button.Root
             variant="primary"
@@ -81,6 +89,14 @@ const Dashboard = () => {
         </div>
       }
     >
+      <VoiceModal
+        open={isVoiceModalOpen}
+        onOpenChange={setIsVoiceModalOpen}
+        onDone={({ voiceJson }) => {
+          navigate('/submit-lead', { state: { voiceJson } });
+        }}
+      />
+
       <div className="pt-4">
         <DashboardStatusTabs
           value={activeTab}

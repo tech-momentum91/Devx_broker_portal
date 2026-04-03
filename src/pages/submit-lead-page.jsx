@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import PageLayout from '@/components/page-layout';
 import ManagedOfficeLeadForm from '@/components/submit-lead/managed-office-lead-form';
 import DesignBuildLeadForm from '@/components/submit-lead/design-build-lead-form';
@@ -20,11 +21,28 @@ const SUBMIT_LEAD_TAB_OPTIONS = [
 ];
 
 const SubmitLeadPage = () => {
+  const location = useLocation();
+  const voiceJson = location.state?.voiceJson ?? null;
   const [activeTab, setActiveTab] = useState('managed');
 
   const handleTabChange = useCallback((value) => {
     setActiveTab(value);
   }, []);
+
+  useEffect(() => {
+    const serviceRaw =
+      voiceJson?.serviceType ??
+      voiceJson?.service_type ??
+      voiceJson?.leadType ??
+      voiceJson?.lead_type ??
+      '';
+    const service = String(serviceRaw).toLowerCase();
+    if (service.includes('design')) {
+      setActiveTab('design');
+    } else if (service) {
+      setActiveTab('managed');
+    }
+  }, [voiceJson]);
 
   return (
     <PageLayout
@@ -86,16 +104,30 @@ const SubmitLeadPage = () => {
         </div>
 
         <div className="mt-4">
+          {voiceJson && (
+            <div className="mb-4 rounded-xl border border-success-light bg-success-lighter/20 p-4">
+              <p className="text-label-sm font-semibold text-success-darker">
+                Voice data processed successfully.
+              </p>
+              <p className="mt-1 text-paragraph-sm text-text-sub-600">
+                The extracted values are available below and passed to the lead form.
+              </p>
+              <pre className="mt-3 max-h-48 overflow-auto rounded-lg bg-bg-white-0 p-3 text-[12px] text-text-main-900">
+                {JSON.stringify(voiceJson, null, 2)}
+              </pre>
+            </div>
+          )}
+
           {!activeTab && (
             <div className="rounded-xl border border-stroke-soft-200 bg-bg-white-0 p-8 text-center text-text-sub-500">
               Select a service type above to continue.
             </div>
           )}
           {activeTab === 'managed' && (
-            <ManagedOfficeLeadForm />
+            <ManagedOfficeLeadForm initialData={voiceJson} />
           )}
           {activeTab === 'design' && (
-            <DesignBuildLeadForm />
+            <DesignBuildLeadForm initialData={voiceJson} />
           )}
         </div>
       </div>

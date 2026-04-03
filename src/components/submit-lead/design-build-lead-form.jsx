@@ -79,7 +79,7 @@ function FieldGroup({ label, required, optional, children, className = '' }) {
   );
 }
 
-const DesignBuildLeadForm = () => {
+const DesignBuildLeadForm = ({ initialData = null }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const submitStatus = useSelector(selectLeadSubmitStatus);
@@ -117,6 +117,26 @@ const DesignBuildLeadForm = () => {
       });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!initialData || typeof initialData !== 'object') return;
+
+    setBuildingName(initialData.buildingName ?? initialData.building_name ?? '');
+    setCity(initialData.city ?? '');
+    setFloor(initialData.floor ?? '');
+    setUnitNumber(initialData.unitNumber ?? initialData.unit_number ?? '');
+    setMicroMarket(initialData.microMarket ?? initialData.micro_market ?? '');
+    setCarpetArea(String(initialData.carpetArea ?? initialData.estimated_carpet_area ?? ''));
+    setPerSftRate(String(initialData.perSftRate ?? initialData.per_sft_rate ?? ''));
+    setTotalBudget(String(initialData.totalBudget ?? initialData.total_d_and_b_budget ?? ''));
+    setDealSituation(initialData.dealSituation ?? initialData.deal_situation ?? '');
+    setClientCompany(initialData.clientCompany ?? initialData.client_company ?? '');
+    setContactPerson(initialData.contactPerson ?? initialData.contact_person ?? '');
+    setPhone(initialData.phone ?? initialData.mobile_number ?? '');
+    setEmail(initialData.email ?? initialData.email_id ?? '');
+    setClientCity(initialData.clientCity ?? initialData.client_city ?? initialData.city ?? '');
+    setRequirementSummary(initialData.requirementSummary ?? initialData.requirement_summary ?? '');
+  }, [initialData]);
 
   useEffect(() => {
     if (submitStatus === 'succeeded') {
