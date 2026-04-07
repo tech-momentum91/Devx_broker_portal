@@ -6,13 +6,19 @@ import * as Input from '@/components/ui/input';
 import * as Select from '@/components/ui/select';
 import * as Textarea from '@/components/ui/textarea';
 import * as Button from '@/components/ui/button';
+import ErrorText from '@/components/ui/error-text';
 import { RiArrowRightSLine } from 'react-icons/ri';
+import { z } from 'zod';
 import { submitLead, resetSubmitState } from '@/redux/leadSubmitSlice';
 import {
   selectLeadSubmitStatus,
   selectLeadSubmitError,
 } from '@/redux/leadSubmitSlice';
-import { getCityOptionsForLeadForm } from '@/services/dashboard-service';
+import {
+  getCityOptionsForLeadForm,
+  getClientCompanyOptionsForLeadForm,
+} from '@/services/dashboard-service';
+import { showErrorToast } from '@/utils/error-utils';
 
 const WORKSPACE_TYPES = [
   { value: 'managed_office', label: 'Managed Office' },
@@ -34,6 +40,32 @@ const DECISION_TIMELINES = [
   { value: '6_months', label: 'Within 6 months' },
   { value: 'flexible', label: 'Flexible' },
 ];
+
+const managedOfficeSchema = z
+  .object({
+    workspaceType: z.string().trim().min(1, 'Workspace Requirement Type is required.'),
+    productType: z.string().trim().optional(),
+    seats: z.string().trim().min(1, 'Number of Seats is required.'),
+  })
+  .superRefine((data, ctx) => {
+    if (data.workspaceType === 'coworking' && !data.productType?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Product Type is required for Coworking workspace.',
+        path: ['productType'],
+      });
+    }
+  });
+
+const getFieldErrorsFromIssues = (issues = []) => {
+  const errors = {};
+  issues.forEach((issue) => {
+    const key = issue?.path?.[0];
+    if (!key || errors[key]) return;
+    errors[key] = issue.message;
+  });
+  return errors;
+};
 
 function SectionHeader({ number, title, subtitle }) {
   return (
@@ -82,12 +114,15 @@ const ManagedOfficeLeadForm = () => {
   const [area, setArea] = useState('');
   const [timeline, setTimeline] = useState('');
   const [clientCompany, setClientCompany] = useState('');
+  const [isCustomClientCompany, setIsCustomClientCompany] = useState(false);
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('');
   const [requirementSummary, setRequirementSummary] = useState('');
   const [cityOptions, setCityOptions] = useState([]);
+  const [clientCompanyOptions, setClientCompanyOptions] = useState([]);
+  const [validationErrors, setValidationErrors] = useState({});
 
   useEffect(() => {
     dispatch(resetSubmitState());
@@ -96,6 +131,32 @@ const ManagedOfficeLeadForm = () => {
   useEffect(() => {
     if (workspaceType !== 'coworking') setProductType('');
   }, [workspaceType]);
+
+  useEffect(() => {
+    if (!initialData || typeof initialData !== 'object') return;
+
+    setWorkspaceType(initialData.workspaceType ?? initialData.workspace_type ?? '');
+    setProductType(initialData.productType ?? initialData.product_type ?? '');
+    setSeats(String(initialData.seats ?? initialData.no_of_seats ?? ''));
+    setMicroMarket(initialData.microMarket ?? initialData.micro_market ?? '');
+    setArea(initialData.area ?? '');
+    setTimeline(initialData.timeline ?? initialData.expected_decision_timeline ?? '');
+    setClientCompany(initialData.clientCompany ?? initialData.client_company ?? '');
+    setContactPerson(initialData.contactPerson ?? initialData.contact_person ?? '');
+    setPhone(initialData.phone ?? initialData.mobile_number ?? '');
+    setEmail(initialData.email ?? initialData.email_id ?? '');
+    setCity(initialData.city ?? '');
+    setRequirementSummary(initialData.requirementSummary ?? initialData.requirement_summary ?? '');
+  }, [initialData]);
+
+  useEffect(() => {
+    if (!clientCompany) {
+      setIsCustomClientCompany(false);
+      return;
+    }
+    const existsInOptions = clientCompanyOptions.some((opt) => opt.value === clientCompany);
+    setIsCustomClientCompany(!existsInOptions);
+  }, [clientCompany, clientCompanyOptions]);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,10 +171,30 @@ const ManagedOfficeLeadForm = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    getClientCompanyOptionsForLeadForm()
+      .then((opts) => {
+        if (!cancelled && Array.isArray(opts)) setClientCompanyOptions(opts);
+      })
+      .catch(() => {
+        if (!cancelled) setClientCompanyOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (submitStatus === 'succeeded') {
       navigate('/submissions', { replace: true });
     }
   }, [submitStatus, navigate]);
+
+  useEffect(() => {
+    if (submitStatus === 'failed' && submitError) {
+      showErrorToast(submitError, { defaultMessage: 'Failed to submit lead.' });
+    }
+  }, [submitStatus, submitError]);
 
   const handleSeatsChange = useCallback((e) => {
     const v = e.target.value;
@@ -121,14 +202,24 @@ const ManagedOfficeLeadForm = () => {
   }, []);
 
   const handleSubmit = useCallback(() => {
-    if (!workspaceType?.trim() || !seats?.trim()) {
+    const trimmedWorkspaceType = workspaceType?.trim();
+    const trimmedSeats = seats?.trim();
+    const trimmedProductType = productType?.trim();
+    const validation = managedOfficeSchema.safeParse({
+      workspaceType: trimmedWorkspaceType,
+      productType: trimmedProductType,
+      seats: trimmedSeats,
+    });
+    if (!validation.success) {
+      setValidationErrors(getFieldErrorsFromIssues(validation.error.issues));
       return;
     }
+    setValidationErrors({});
     dispatch(
       submitLead({
-        workspaceType: workspaceType.trim(),
-        productType: showProductType ? productType.trim() : '',
-        seats: seats.trim(),
+        workspaceType: trimmedWorkspaceType,
+        productType: showProductType ? trimmedProductType : '',
+        seats: trimmedSeats,
         microMarket: microMarket.trim(),
         area: area.trim(),
         timeline: timeline.trim(),
@@ -174,8 +265,17 @@ const ManagedOfficeLeadForm = () => {
           />
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <FieldGroup label="Workspace Requirement Type" required>
-              <Select.Root value={workspaceType} onValueChange={setWorkspaceType}>
-                <Select.Trigger className={inputTriggerClass}>
+              <Select.Root
+                value={workspaceType}
+                onValueChange={(value) => {
+                  setWorkspaceType(value);
+                  setValidationErrors((prev) => ({ ...prev, workspaceType: undefined }));
+                }}
+              >
+                <Select.Trigger
+                  className={inputTriggerClass}
+                  hasError={Boolean(validationErrors.workspaceType)}
+                >
                   <Select.Value placeholder="Select type…" />
                 </Select.Trigger>
                 <Select.Content>
@@ -186,12 +286,22 @@ const ManagedOfficeLeadForm = () => {
                   ))}
                 </Select.Content>
               </Select.Root>
+              <ErrorText>{validationErrors.workspaceType}</ErrorText>
             </FieldGroup>
 
             {showProductType && (
               <FieldGroup label="Product Type" required>
-                <Select.Root value={productType} onValueChange={setProductType}>
-                  <Select.Trigger className={inputTriggerClass}>
+                <Select.Root
+                  value={productType}
+                  onValueChange={(value) => {
+                    setProductType(value);
+                    setValidationErrors((prev) => ({ ...prev, productType: undefined }));
+                  }}
+                >
+                  <Select.Trigger
+                    className={inputTriggerClass}
+                    hasError={Boolean(validationErrors.productType)}
+                  >
                     <Select.Value placeholder="Select product…" />
                   </Select.Trigger>
                   <Select.Content>
@@ -202,21 +312,26 @@ const ManagedOfficeLeadForm = () => {
                     ))}
                   </Select.Content>
                 </Select.Root>
+                <ErrorText>{validationErrors.productType}</ErrorText>
               </FieldGroup>
             )}
 
             <FieldGroup label="Number of Seats" required>
-              <Input.Root className={inputRootClass}>
+              <Input.Root className={inputRootClass} hasError={Boolean(validationErrors.seats)}>
                 <Input.Wrapper>
                   <Input.Input
                     type="text"
                     inputMode="numeric"
                     placeholder="e.g. 80"
                     value={seats}
-                    onChange={handleSeatsChange}
+                    onChange={(e) => {
+                      handleSeatsChange(e);
+                      setValidationErrors((prev) => ({ ...prev, seats: undefined }));
+                    }}
                   />
                 </Input.Wrapper>
               </Input.Root>
+              <ErrorText>{validationErrors.seats}</ErrorText>
             </FieldGroup>
 
             <FieldGroup label="Micro Market" optional>
@@ -271,16 +386,49 @@ const ManagedOfficeLeadForm = () => {
           />
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <FieldGroup label="Client Company">
-              <Input.Root className={inputRootClass}>
-                <Input.Wrapper>
-                  <Input.Input
-                    type="text"
-                    placeholder="e.g. Tata Elxsi"
-                    value={clientCompany}
-                    onChange={(e) => setClientCompany(e.target.value)}
-                  />
-                </Input.Wrapper>
-              </Input.Root>
+              {isCustomClientCompany ? (
+                <Input.Root className={inputRootClass}>
+                  <Input.Wrapper>
+                    <Input.Input
+                      autoFocus
+                      type="text"
+                      placeholder="Enter company name"
+                      value={clientCompany}
+                      onChange={(e) => setClientCompany(e.target.value)}
+                      onBlur={() => {
+                        const trimmed = clientCompany.trim();
+                        if (!trimmed) {
+                          setIsCustomClientCompany(false);
+                        }
+                      }}
+                    />
+                  </Input.Wrapper>
+                </Input.Root>
+              ) : (
+                <Select.Root
+                  value={clientCompany}
+                  onValueChange={(value) => {
+                    if (value === '__add_new__') {
+                      setIsCustomClientCompany(true);
+                      setClientCompany('');
+                      return;
+                    }
+                    setClientCompany(value);
+                  }}
+                >
+                  <Select.Trigger className={inputTriggerClass}>
+                    <Select.Value placeholder="Select company..." />
+                  </Select.Trigger>
+                  <Select.Content>
+                    {clientCompanyOptions.map((opt) => (
+                      <Select.Item key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </Select.Item>
+                    ))}
+                    <Select.Item value="__add_new__">+ Add New Company</Select.Item>
+                  </Select.Content>
+                </Select.Root>
+              )}
             </FieldGroup>
 
             <FieldGroup label="Contact Person">
