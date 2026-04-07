@@ -5,6 +5,15 @@
 
 import apiClient from '@/api/axios';
 
+function extractErrorMessage(body) {
+  if (!body) return '';
+  if (typeof body === 'string') return body;
+  if (typeof body?.message === 'string') return body.message;
+  if (typeof body?.exc === 'string') return body.exc;
+  if (typeof body?._server_messages === 'string') return body._server_messages;
+  return '';
+}
+
 /**
  * Submit a lead from the broker portal. Creates a CRM Lead document with all form data.
  * Payload shape:
@@ -23,12 +32,42 @@ export async function submitLeadFromBrokerPortal(payload) {
     payload,
   );
   const data = response?.data;
-  if (data?.exc) {
-    throw new Error(data.message || data.exc);
+  const messagePayload = data?.message;
+  const leadName =
+    data?.name ??
+    messagePayload?.name ??
+    messagePayload?.lead_name ??
+    messagePayload?.data?.name ??
+    null;
+
+  const hasExplicitFailure =
+    Boolean(data?.exc) ||
+    messagePayload?.success === false ||
+    messagePayload?.status === 'error' ||
+    data?.status === 'error';
+
+  if (hasExplicitFailure) {
+    throw new Error(
+      extractErrorMessage(data) ||
+      extractErrorMessage(messagePayload) ||
+      'Failed to submit lead',
+    );
+  }
+
+  // Some Frappe responses return 200 even when operation fails.
+  // If we do not get a lead name, treat it as failure so UI can show error.
+  if (!leadName) {
+    throw new Error(
+      extractErrorMessage(data) ||
+      extractErrorMessage(messagePayload) ||
+      'Lead was not created. Please try again.',
+    );
   }
   return {
-    name: data?.name ?? data?.message?.name,
-    message: data?.message ?? 'Lead created successfully',
+    name: leadName,
+    message:
+      (typeof messagePayload === 'string' ? messagePayload : messagePayload?.message) ||
+      'Lead created successfully',
   };
 }
 

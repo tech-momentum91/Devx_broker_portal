@@ -7,13 +7,19 @@ import * as Select from '@/components/ui/select';
 import * as Textarea from '@/components/ui/textarea';
 import * as Button from '@/components/ui/button';
 import * as Radio from '@/components/ui/radio';
+import ErrorText from '@/components/ui/error-text';
 import { RiArrowRightSLine } from 'react-icons/ri';
+import { z } from 'zod';
 import { submitLead, resetSubmitState } from '@/redux/leadSubmitSlice';
 import {
   selectLeadSubmitStatus,
   selectLeadSubmitError,
 } from '@/redux/leadSubmitSlice';
-import { getCityOptionsForLeadForm } from '@/services/dashboard-service';
+import {
+  getCityOptionsForLeadForm,
+  getClientCompanyOptionsForLeadForm,
+} from '@/services/dashboard-service';
+import { showErrorToast } from '@/utils/error-utils';
 
 const DEAL_SITUATION_OPTIONS = [
   {
@@ -33,6 +39,30 @@ const DEAL_SITUATION_OPTIONS = [
     label: 'Client onboarded designer – need execution partner',
   },
 ];
+
+const designBuildSchema = z.object({
+  buildingName: z.string().trim().min(1, 'Building Name is required.'),
+  city: z.string().trim().min(1, 'City is required.'),
+  microMarket: z.string().trim().min(1, 'Micro Market is required.'),
+  carpetArea: z.string().trim().min(1, 'Estimated Carpet Area (SFT) is required.'),
+  perSftRate: z.string().trim().min(1, 'Per SFT Rate (₹) is required.'),
+  totalBudget: z.string().trim().min(1, 'Total D&B Budget (₹) is required.'),
+  clientCompany: z.string().trim().min(1, 'Client Company is required.'),
+  contactPerson: z.string().trim().min(1, 'Contact Person is required.'),
+  phone: z.string().trim().min(1, 'Phone is required.'),
+  email: z.string().trim().min(1, 'Email is required.'),
+  clientCity: z.string().trim().min(1, 'Client City is required.'),
+});
+
+const getFieldErrorsFromIssues = (issues = []) => {
+  const errors = {};
+  issues.forEach((issue) => {
+    const key = issue?.path?.[0];
+    if (!key || errors[key]) return;
+    errors[key] = issue.message;
+  });
+  return errors;
+};
 
 function FormSection({ step, title, subtitle, children }) {
   return (
@@ -95,12 +125,15 @@ const DesignBuildLeadForm = () => {
   const [totalBudget, setTotalBudget] = useState('');
   const [dealSituation, setDealSituation] = useState('');
   const [clientCompany, setClientCompany] = useState('');
+  const [isCustomClientCompany, setIsCustomClientCompany] = useState(false);
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [clientCity, setClientCity] = useState('');
   const [requirementSummary, setRequirementSummary] = useState('');
   const [cityOptions, setCityOptions] = useState([]);
+  const [clientCompanyOptions, setClientCompanyOptions] = useState([]);
+  const [validationErrors, setValidationErrors] = useState({});
 
   useEffect(() => {
     dispatch(resetSubmitState());
@@ -119,10 +152,59 @@ const DesignBuildLeadForm = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    getClientCompanyOptionsForLeadForm()
+      .then((opts) => {
+        if (!cancelled && Array.isArray(opts)) setClientCompanyOptions(opts);
+      })
+      .catch(() => {
+        if (!cancelled) setClientCompanyOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!initialData || typeof initialData !== 'object') return;
+
+    setBuildingName(initialData.buildingName ?? initialData.building_name ?? '');
+    setCity(initialData.city ?? '');
+    setFloor(initialData.floor ?? '');
+    setUnitNumber(initialData.unitNumber ?? initialData.unit_number ?? '');
+    setMicroMarket(initialData.microMarket ?? initialData.micro_market ?? '');
+    setCarpetArea(String(initialData.carpetArea ?? initialData.estimated_carpet_area ?? ''));
+    setPerSftRate(String(initialData.perSftRate ?? initialData.per_sft_rate ?? ''));
+    setTotalBudget(String(initialData.totalBudget ?? initialData.total_d_and_b_budget ?? ''));
+    setDealSituation(initialData.dealSituation ?? initialData.deal_situation ?? '');
+    setClientCompany(initialData.clientCompany ?? initialData.client_company ?? '');
+    setContactPerson(initialData.contactPerson ?? initialData.contact_person ?? '');
+    setPhone(initialData.phone ?? initialData.mobile_number ?? '');
+    setEmail(initialData.email ?? initialData.email_id ?? '');
+    setClientCity(initialData.clientCity ?? initialData.client_city ?? initialData.city ?? '');
+    setRequirementSummary(initialData.requirementSummary ?? initialData.requirement_summary ?? '');
+  }, [initialData]);
+
+  useEffect(() => {
+    if (!clientCompany) {
+      setIsCustomClientCompany(false);
+      return;
+    }
+    const existsInOptions = clientCompanyOptions.some((opt) => opt.value === clientCompany);
+    setIsCustomClientCompany(!existsInOptions);
+  }, [clientCompany, clientCompanyOptions]);
+
+  useEffect(() => {
     if (submitStatus === 'succeeded') {
       navigate('/submissions', { replace: true });
     }
   }, [submitStatus, navigate]);
+
+  useEffect(() => {
+    if (submitStatus === 'failed' && submitError) {
+      showErrorToast(submitError, { defaultMessage: 'Failed to submit lead.' });
+    }
+  }, [submitStatus, submitError]);
 
   const handleNumericChange = useCallback((setter, e) => {
     const v = e.target.value;
@@ -130,25 +212,56 @@ const DesignBuildLeadForm = () => {
   }, []);
 
   const handleSubmit = useCallback(() => {
+    const trimmedBuildingName = buildingName.trim();
+    const trimmedCity = city.trim();
+    const trimmedMicroMarket = microMarket.trim();
+    const trimmedCarpetArea = carpetArea.trim();
+    const trimmedPerSftRate = perSftRate.trim();
+    const trimmedTotalBudget = totalBudget.trim();
+    const trimmedClientCompany = clientCompany.trim();
+    const trimmedContactPerson = contactPerson.trim();
+    const trimmedPhone = phone.trim();
+    const trimmedEmail = email.trim();
+    const trimmedClientCity = clientCity.trim();
+
+    const validation = designBuildSchema.safeParse({
+      buildingName: trimmedBuildingName,
+      city: trimmedCity,
+      microMarket: trimmedMicroMarket,
+      carpetArea: trimmedCarpetArea,
+      perSftRate: trimmedPerSftRate,
+      totalBudget: trimmedTotalBudget,
+      clientCompany: trimmedClientCompany,
+      contactPerson: trimmedContactPerson,
+      phone: trimmedPhone,
+      email: trimmedEmail,
+      clientCity: trimmedClientCity,
+    });
+    if (!validation.success) {
+      setValidationErrors(getFieldErrorsFromIssues(validation.error.issues));
+      return;
+    }
+
+    setValidationErrors({});
     const dealSituationLabel =
       DEAL_SITUATION_OPTIONS.find((o) => o.value === dealSituation)?.label ?? dealSituation;
     dispatch(
       submitLead({
         serviceType: 'Design and Build',
-        buildingName: buildingName.trim(),
-        city: city.trim(),
+        buildingName: trimmedBuildingName,
+        city: trimmedCity,
         floor: floor.trim(),
         unitNumber: unitNumber.trim(),
-        microMarket: microMarket.trim(),
-        carpetArea: carpetArea.trim(),
-        perSftRate: perSftRate.trim(),
-        totalBudget: totalBudget.trim(),
+        microMarket: trimmedMicroMarket,
+        carpetArea: trimmedCarpetArea,
+        perSftRate: trimmedPerSftRate,
+        totalBudget: trimmedTotalBudget,
         dealSituation: dealSituationLabel,
-        clientCompany: clientCompany.trim(),
-        contactPerson: contactPerson.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        clientCity: clientCity.trim(),
+        clientCompany: trimmedClientCompany,
+        contactPerson: trimmedContactPerson,
+        phone: trimmedPhone,
+        email: trimmedEmail,
+        clientCity: trimmedClientCity,
         requirementSummary: requirementSummary.trim(),
       }),
     );
@@ -186,21 +299,37 @@ const DesignBuildLeadForm = () => {
             <SubsectionTitle>SITE INFORMATION</SubsectionTitle>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <FieldGroup label="Building Name" required>
-                <Input.Root className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200">
+                <Input.Root
+                  className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200"
+                  hasError={Boolean(validationErrors.buildingName)}
+                >
                   <Input.Wrapper>
                     <Input.Input
                       type="text"
                       placeholder="e.g. Prestige Tech Park"
                       value={buildingName}
-                      onChange={(e) => setBuildingName(e.target.value)}
+                      onChange={(e) => {
+                        setBuildingName(e.target.value);
+                        setValidationErrors((prev) => ({ ...prev, buildingName: undefined }));
+                      }}
                     />
                   </Input.Wrapper>
                 </Input.Root>
+                <ErrorText>{validationErrors.buildingName}</ErrorText>
               </FieldGroup>
 
               <FieldGroup label="City" required>
-                <Select.Root value={city} onValueChange={setCity}>
-                  <Select.Trigger className="w-full bg-bg-white-0 rounded-lg ring-1 ring-stroke-soft-200">
+                <Select.Root
+                  value={city}
+                  onValueChange={(value) => {
+                    setCity(value);
+                    setValidationErrors((prev) => ({ ...prev, city: undefined }));
+                  }}
+                >
+                  <Select.Trigger
+                    className="w-full bg-bg-white-0 rounded-lg ring-1 ring-stroke-soft-200"
+                    hasError={Boolean(validationErrors.city)}
+                  >
                     <Select.Value placeholder="Select city..." />
                   </Select.Trigger>
                   <Select.Content>
@@ -211,6 +340,7 @@ const DesignBuildLeadForm = () => {
                     ))}
                   </Select.Content>
                 </Select.Root>
+                <ErrorText>{validationErrors.city}</ErrorText>
               </FieldGroup>
 
               <FieldGroup label="Floor" optional>
@@ -241,59 +371,87 @@ const DesignBuildLeadForm = () => {
             </div>
 
             <FieldGroup label="Micro Market" required>
-              <Input.Root className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200">
+              <Input.Root
+                className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200"
+                hasError={Boolean(validationErrors.microMarket)}
+              >
                 <Input.Wrapper>
                   <Input.Input
                     type="text"
                     placeholder="e.g. Outer Ring Road, Whitefield"
                     value={microMarket}
-                    onChange={(e) => setMicroMarket(e.target.value)}
+                    onChange={(e) => {
+                      setMicroMarket(e.target.value);
+                      setValidationErrors((prev) => ({ ...prev, microMarket: undefined }));
+                    }}
                   />
                 </Input.Wrapper>
               </Input.Root>
+              <ErrorText>{validationErrors.microMarket}</ErrorText>
             </FieldGroup>
 
             <SubsectionTitle>BUDGET BREAKDOWN</SubsectionTitle>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
               <FieldGroup label="Estimated Carpet Area (SFT)" required>
-                <Input.Root className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200">
+                <Input.Root
+                  className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200"
+                  hasError={Boolean(validationErrors.carpetArea)}
+                >
                   <Input.Wrapper>
                     <Input.Input
                       type="text"
                       inputMode="numeric"
                       placeholder="e.g. 12000"
                       value={carpetArea}
-                      onChange={(e) => handleNumericChange(setCarpetArea, e)}
+                      onChange={(e) => {
+                        handleNumericChange(setCarpetArea, e);
+                        setValidationErrors((prev) => ({ ...prev, carpetArea: undefined }));
+                      }}
                     />
                   </Input.Wrapper>
                 </Input.Root>
+                <ErrorText>{validationErrors.carpetArea}</ErrorText>
               </FieldGroup>
 
               <FieldGroup label="Per SFT Rate (₹)" required>
-                <Input.Root className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200">
+                <Input.Root
+                  className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200"
+                  hasError={Boolean(validationErrors.perSftRate)}
+                >
                   <Input.Wrapper>
                     <Input.Input
                       type="text"
                       inputMode="numeric"
                       placeholder="e.g. 2500"
                       value={perSftRate}
-                      onChange={(e) => handleNumericChange(setPerSftRate, e)}
+                      onChange={(e) => {
+                        handleNumericChange(setPerSftRate, e);
+                        setValidationErrors((prev) => ({ ...prev, perSftRate: undefined }));
+                      }}
                     />
                   </Input.Wrapper>
                 </Input.Root>
+                <ErrorText>{validationErrors.perSftRate}</ErrorText>
               </FieldGroup>
 
               <FieldGroup label="Total D&B Budget (₹)" required>
-                <Input.Root className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200">
+                <Input.Root
+                  className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200"
+                  hasError={Boolean(validationErrors.totalBudget)}
+                >
                   <Input.Wrapper>
                     <Input.Input
                       type="text"
                       placeholder="e.g. ₹4.2 Cr"
                       value={totalBudget}
-                      onChange={(e) => handleNumericChange(setTotalBudget, e)}
+                      onChange={(e) => {
+                        handleNumericChange(setTotalBudget, e);
+                        setValidationErrors((prev) => ({ ...prev, totalBudget: undefined }));
+                      }}
                     />
                   </Input.Wrapper>
                 </Input.Root>
+                <ErrorText>{validationErrors.totalBudget}</ErrorText>
               </FieldGroup>
             </div>
           </div>
@@ -336,62 +494,136 @@ const DesignBuildLeadForm = () => {
         >
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <FieldGroup label="Client Company" required>
-              <Input.Root className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200">
-                <Input.Wrapper>
-                  <Input.Input
-                    type="text"
-                    placeholder="e.g. Peenya Manufacturing Hub"
-                    value={clientCompany}
-                    onChange={(e) => setClientCompany(e.target.value)}
-                  />
-                </Input.Wrapper>
-              </Input.Root>
+              {isCustomClientCompany ? (
+                <Input.Root
+                  className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200"
+                  hasError={Boolean(validationErrors.clientCompany)}
+                >
+                  <Input.Wrapper>
+                    <Input.Input
+                      autoFocus
+                      type="text"
+                      placeholder="Enter company name"
+                      value={clientCompany}
+                      onChange={(e) => {
+                        setClientCompany(e.target.value);
+                        setValidationErrors((prev) => ({ ...prev, clientCompany: undefined }));
+                      }}
+                      onBlur={() => {
+                        const trimmed = clientCompany.trim();
+                        if (!trimmed) {
+                          setIsCustomClientCompany(false);
+                        }
+                      }}
+                    />
+                  </Input.Wrapper>
+                </Input.Root>
+              ) : (
+                <Select.Root
+                  value={clientCompany}
+                  onValueChange={(value) => {
+                    if (value === '__add_new__') {
+                      setIsCustomClientCompany(true);
+                      setClientCompany('');
+                      return;
+                    }
+                    setClientCompany(value);
+                    setValidationErrors((prev) => ({ ...prev, clientCompany: undefined }));
+                  }}
+                >
+                  <Select.Trigger
+                    className="w-full bg-bg-white-0 rounded-lg ring-1 ring-stroke-soft-200"
+                    hasError={Boolean(validationErrors.clientCompany)}
+                  >
+                    <Select.Value placeholder="Select company..." />
+                  </Select.Trigger>
+                  <Select.Content>
+                    {clientCompanyOptions.map((opt) => (
+                      <Select.Item key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </Select.Item>
+                    ))}
+                    <Select.Item value="__add_new__">+ Add New Company</Select.Item>
+                  </Select.Content>
+                </Select.Root>
+              )}
+              <ErrorText>{validationErrors.clientCompany}</ErrorText>
             </FieldGroup>
 
             <FieldGroup label="Contact Person" required>
-              <Input.Root className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200">
+              <Input.Root
+                className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200"
+                hasError={Boolean(validationErrors.contactPerson)}
+              >
                 <Input.Wrapper>
                   <Input.Input
                     type="text"
                     placeholder="e.g. Arvind Shetty"
                     value={contactPerson}
-                    onChange={(e) => setContactPerson(e.target.value)}
+                    onChange={(e) => {
+                      setContactPerson(e.target.value);
+                      setValidationErrors((prev) => ({ ...prev, contactPerson: undefined }));
+                    }}
                   />
                 </Input.Wrapper>
               </Input.Root>
+              <ErrorText>{validationErrors.contactPerson}</ErrorText>
             </FieldGroup>
 
             <FieldGroup label="Phone" required>
-              <Input.Root className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200">
+              <Input.Root
+                className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200"
+                hasError={Boolean(validationErrors.phone)}
+              >
                 <Input.Wrapper>
                   <Input.Input
                     type="tel"
                     placeholder="+91 98765 43210"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setValidationErrors((prev) => ({ ...prev, phone: undefined }));
+                    }}
                   />
                 </Input.Wrapper>
               </Input.Root>
+              <ErrorText>{validationErrors.phone}</ErrorText>
             </FieldGroup>
 
             <FieldGroup label="Email" required>
-              <Input.Root className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200">
+              <Input.Root
+                className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200"
+                hasError={Boolean(validationErrors.email)}
+              >
                 <Input.Wrapper>
                   <Input.Input
                     type="email"
                     placeholder="contact@company.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setValidationErrors((prev) => ({ ...prev, email: undefined }));
+                    }}
                   />
                 </Input.Wrapper>
               </Input.Root>
+              <ErrorText>{validationErrors.email}</ErrorText>
             </FieldGroup>
           </div>
 
           <div className="mt-1">
             <FieldGroup label="City" required>
-              <Select.Root value={clientCity} onValueChange={setClientCity}>
-                <Select.Trigger className="w-full bg-bg-white-0 rounded-lg ring-1 ring-stroke-soft-200">
+              <Select.Root
+                value={clientCity}
+                onValueChange={(value) => {
+                  setClientCity(value);
+                  setValidationErrors((prev) => ({ ...prev, clientCity: undefined }));
+                }}
+              >
+                <Select.Trigger
+                  className="w-full bg-bg-white-0 rounded-lg ring-1 ring-stroke-soft-200"
+                  hasError={Boolean(validationErrors.clientCity)}
+                >
                   <Select.Value placeholder="Select city..." />
                 </Select.Trigger>
                 <Select.Content>
@@ -402,6 +634,7 @@ const DesignBuildLeadForm = () => {
                   ))}
                 </Select.Content>
               </Select.Root>
+              <ErrorText>{validationErrors.clientCity}</ErrorText>
             </FieldGroup>
           </div>
         </FormSection>
