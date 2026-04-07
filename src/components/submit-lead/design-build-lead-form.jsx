@@ -126,9 +126,23 @@ const DesignBuildLeadForm = ({ initialData = null }) => {
     setFloor(initialData.floor ?? '');
     setUnitNumber(initialData.unitNumber ?? initialData.unit_number ?? '');
     setMicroMarket(initialData.microMarket ?? initialData.micro_market ?? '');
-    setCarpetArea(String(initialData.carpetArea ?? initialData.estimated_carpet_area ?? ''));
+    setCarpetArea(
+      String(
+        initialData.carpetArea ??
+          initialData.carpet_area ??
+          initialData.estimated_carpet_area ??
+          '',
+      ),
+    );
     setPerSftRate(String(initialData.perSftRate ?? initialData.per_sft_rate ?? ''));
-    setTotalBudget(String(initialData.totalBudget ?? initialData.total_d_and_b_budget ?? ''));
+    setTotalBudget(
+      String(
+        initialData.totalBudget ??
+          initialData.total_budget ??
+          initialData.total_d_and_b_budget ??
+          '',
+      ),
+    );
     setDealSituation(initialData.dealSituation ?? initialData.deal_situation ?? '');
     setClientCompany(initialData.clientCompany ?? initialData.client_company ?? '');
     setContactPerson(initialData.contactPerson ?? initialData.contact_person ?? '');

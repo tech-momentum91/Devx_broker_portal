@@ -1,8 +1,8 @@
 import apiClient from '@/api/axios';
 
 /**
- * Voice ticket service for broker portal.
- * Calls backend endpoint with multipart audio upload.
+ * Voice lead extraction for broker portal.
+ * POSTs multipart audio to Frappe whitelist method.
  */
 class VoiceTicketService {
   async processMicAudio(blob) {
@@ -11,15 +11,12 @@ class VoiceTicketService {
 
     formData.append('audio', audioBlob, 'voice-note.webm');
 
-    const response = await fetch(
-      'https://95b7-27-109-18-82.ngrok-free.app/broker/extract-from-audio',
-      {
-        method: 'POST',
-        body: formData,
-      }
+    const response = await apiClient.post(
+      '/method/devx_ai.voice_cp_portal.api.extract_lead_from_audio',
+      formData,
     );
 
-    return await response.json();
+    return response.data;
   }
 }
 

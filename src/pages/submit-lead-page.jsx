@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import PageLayout from '@/components/page-layout';
 import ManagedOfficeLeadForm from '@/components/submit-lead/managed-office-lead-form';
@@ -20,9 +20,72 @@ const SUBMIT_LEAD_TAB_OPTIONS = [
   },
 ];
 
+/** Resolve service type from voice/AI payload (top-level, nested fields, or Frappe message). */
+function getServiceTypeFromVoicePayload(payload) {
+  if (!payload || typeof payload !== 'object') return '';
+  const p = payload;
+  return (
+    p.serviceType ??
+    p.service_type ??
+    p.fields?.service_type ??
+    p.message?.service_type ??
+    p.message?.fields?.service_type ??
+    p.leadType ??
+    p.lead_type ??
+    ''
+  );
+}
+
+function isDesignAndBuildServiceType(serviceRaw) {
+  const s = String(serviceRaw ?? '').toLowerCase();
+  if (!s) return false;
+  // Matches "Design and Build", "Design & Build", D&B shorthand, etc.
+  if (s.includes('design') && s.includes('build')) return true;
+  if (/\bd\s*&\s*b\b/i.test(String(serviceRaw ?? ''))) return true;
+  return false;
+}
+
+/**
+ * Voice/AI payloads nest extracted values under `fields` (snake_case).
+ * Merge into one object so lead forms prefill all inputs (same keys they already read).
+ */
+function normalizeVoiceLeadInitialData(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const f = raw.fields && typeof raw.fields === 'object' ? raw.fields : {};
+  const pick = (...keys) => {
+    for (const k of keys) {
+      let v = f[k];
+      if (v === undefined || v === null) v = raw[k];
+      if (v !== undefined && v !== null && v !== '') return v;
+    }
+    return undefined;
+  };
+
+  return {
+    ...raw,
+    ...f,
+    // camelCase aliases (forms often check camelCase first)
+    buildingName: pick('building_name', 'buildingName') ?? raw.buildingName,
+    carpetArea: pick('carpet_area', 'carpetArea', 'estimated_carpet_area') ?? raw.carpetArea,
+    totalBudget: pick('total_budget', 'totalBudget', 'total_d_and_b_budget') ?? raw.totalBudget,
+    perSftRate: pick('per_sft_rate', 'perSftRate') ?? raw.perSftRate,
+    microMarket: pick('micro_market', 'microMarket') ?? raw.microMarket,
+    unitNumber: pick('unit_number', 'unitNumber') ?? raw.unitNumber,
+    dealSituation: pick('deal_situation', 'dealSituation') ?? raw.dealSituation,
+    clientCompany: pick('client_company', 'clientCompany') ?? raw.clientCompany,
+    contactPerson: pick('contact_person', 'contactPerson') ?? raw.contactPerson,
+    requirementSummary: pick('requirement_summary', 'requirementSummary') ?? raw.requirementSummary,
+    clientCity: pick('client_city', 'clientCity') ?? raw.clientCity,
+    workspaceType: pick('workspace_type', 'workspaceType') ?? raw.workspaceType,
+    productType: pick('product_type', 'productType') ?? raw.productType,
+    serviceType: pick('service_type', 'serviceType') ?? raw.serviceType,
+  };
+}
+
 const SubmitLeadPage = () => {
   const location = useLocation();
   const voiceJson = location.state?.voiceJson ?? null;
+  const leadInitialData = useMemo(() => normalizeVoiceLeadInitialData(voiceJson), [voiceJson]);
   const [activeTab, setActiveTab] = useState('managed');
 
   const handleTabChange = useCallback((value) => {
@@ -30,12 +93,11 @@ const SubmitLeadPage = () => {
   }, []);
 
   useEffect(() => {
-    const serviceRaw =
-      voiceJson?.serviceType ??
-      voiceJson?.service_type ??
-      voiceJson?.leadType ??
-      voiceJson?.lead_type ??
-      '';
+    const serviceRaw = getServiceTypeFromVoicePayload(voiceJson);
+    if (isDesignAndBuildServiceType(serviceRaw)) {
+      setActiveTab('design');
+      return;
+    }
     const service = String(serviceRaw).toLowerCase();
     if (service.includes('design')) {
       setActiveTab('design');
@@ -104,19 +166,7 @@ const SubmitLeadPage = () => {
         </div>
 
         <div className="mt-4">
-          {voiceJson && (
-            <div className="mb-4 rounded-xl border border-success-light bg-success-lighter/20 p-4">
-              <p className="text-label-sm font-semibold text-success-darker">
-                Voice data processed successfully.
-              </p>
-              <p className="mt-1 text-paragraph-sm text-text-sub-600">
-                The extracted values are available below and passed to the lead form.
-              </p>
-              <pre className="mt-3 max-h-48 overflow-auto rounded-lg bg-bg-white-0 p-3 text-[12px] text-text-main-900">
-                {JSON.stringify(voiceJson, null, 2)}
-              </pre>
-            </div>
-          )}
+          
 
           {!activeTab && (
             <div className="rounded-xl border border-stroke-soft-200 bg-bg-white-0 p-8 text-center text-text-sub-500">
@@ -124,10 +174,10 @@ const SubmitLeadPage = () => {
             </div>
           )}
           {activeTab === 'managed' && (
-            <ManagedOfficeLeadForm initialData={voiceJson} />
+            <ManagedOfficeLeadForm initialData={leadInitialData} />
           )}
           {activeTab === 'design' && (
-            <DesignBuildLeadForm initialData={voiceJson} />
+            <DesignBuildLeadForm initialData={leadInitialData} />
           )}
         </div>
       </div>
