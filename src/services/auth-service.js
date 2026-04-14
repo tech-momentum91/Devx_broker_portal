@@ -35,6 +35,11 @@ export async function logOutService() {
     const { data, status } = await apiClient.get('/method/logout');
     return { data, status };
   } catch (error) {
+    const status = error.response?.status;
+    // Session may already be invalid — still treat as logged out client-side
+    if (status === 401 || status === 403) {
+      return { data: null, status };
+    }
     console.error('Logout service error', error);
     const errorMessage = error.response?.data?.message || 'Logout failed. Please try again.';
     return { error: errorMessage };

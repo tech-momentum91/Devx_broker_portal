@@ -128,6 +128,8 @@ const initialState = {
     data: null,
     isLoading: false,
     error: null,
+    saving: false,
+    saveError: null,
   },
 };
 
@@ -216,6 +218,48 @@ export const getCpContactProfile = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || error.message || 'Failed to load profile',
+      );
+    }
+  },
+);
+
+/** Broker portal: PATCH CP Contact via channel_partner.update_cp_contact (camelCase payload). */
+export const updateCpContactProfile = createAsyncThunk(
+  'profile/updateCpContactProfile',
+  async ({ name, payload }, { rejectWithValue }) => {
+    if (!name) {
+      return rejectWithValue('Missing CP Contact id');
+    }
+    try {
+      const response = await apiClient.post(
+        '/method/devx.channel_partner.api.channel_partner.update_cp_contact',
+        { name, payload },
+        { withCredentials: true },
+      );
+      const result = response.data;
+      if (result?.exc_type) {
+        let msg = result.message;
+        if (result._server_messages) {
+          try {
+            const arr = JSON.parse(result._server_messages);
+            if (Array.isArray(arr) && arr.length) {
+              const last = arr[arr.length - 1];
+              const parsed = typeof last === 'string' ? JSON.parse(last) : last;
+              msg = parsed?.message || msg;
+            }
+          } catch {
+            /* keep result.message */
+          }
+        }
+        return rejectWithValue(msg || 'Failed to save profile');
+      }
+      return result?.message ?? result;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message ||
+          error.response?.data?.exc ||
+          error.message ||
+          'Failed to save profile',
       );
     }
   },
@@ -638,6 +682,9 @@ const profileSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    clearCpContactSaveError: (state) => {
+      state.cpContactProfile.saveError = null;
+    },
 
     setModalOpen: (state, action) => {
       state.usersProfile.modal.isOpen = action.payload;
@@ -705,6 +752,7 @@ const profileSlice = createSlice({
     builder.addCase(getCpContactProfile.pending, (state) => {
       state.cpContactProfile.isLoading = true;
       state.cpContactProfile.error = null;
+      state.cpContactProfile.saveError = null;
     });
     builder.addCase(getCpContactProfile.fulfilled, (state, action) => {
       state.cpContactProfile.isLoading = false;
@@ -715,6 +763,19 @@ const profileSlice = createSlice({
       state.cpContactProfile.isLoading = false;
       state.cpContactProfile.data = null;
       state.cpContactProfile.error = action.payload || action.error?.message;
+    });
+
+    builder.addCase(updateCpContactProfile.pending, (state) => {
+      state.cpContactProfile.saving = true;
+      state.cpContactProfile.saveError = null;
+    });
+    builder.addCase(updateCpContactProfile.fulfilled, (state) => {
+      state.cpContactProfile.saving = false;
+      state.cpContactProfile.saveError = null;
+    });
+    builder.addCase(updateCpContactProfile.rejected, (state, action) => {
+      state.cpContactProfile.saving = false;
+      state.cpContactProfile.saveError = action.payload || action.error?.message || 'Save failed';
     });
 
     builder.addCase(saveProfile.pending, (state, action) => {
@@ -1101,6 +1162,7 @@ export const {
   setLoading,
   setError,
   clearError,
+  clearCpContactSaveError,
   updateProfileData,
   setModalOpen,
   setModalClose,

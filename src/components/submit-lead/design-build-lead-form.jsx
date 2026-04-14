@@ -109,7 +109,16 @@ function FieldGroup({ label, required, optional, children, className = '' }) {
   );
 }
 
-const DesignBuildLeadForm = () => {
+function pickInitialString(src, ...keys) {
+  if (!src || typeof src !== 'object') return '';
+  for (const k of keys) {
+    const v = src[k];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();
+  }
+  return '';
+}
+
+const DesignBuildLeadForm = ({ initialData = null }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const submitStatus = useSelector(selectLeadSubmitStatus);
@@ -138,6 +147,39 @@ const DesignBuildLeadForm = () => {
   useEffect(() => {
     dispatch(resetSubmitState());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (!initialData || typeof initialData !== 'object') return;
+    const d = initialData;
+    setBuildingName(pickInitialString(d, 'buildingName', 'building_name'));
+    setCity(pickInitialString(d, 'city', 'site_city', 'project_city'));
+    setFloor(pickInitialString(d, 'floor', 'floor_level'));
+    setUnitNumber(pickInitialString(d, 'unitNumber', 'unit_number'));
+    setMicroMarket(pickInitialString(d, 'microMarket', 'micro_market'));
+    setCarpetArea(pickInitialString(d, 'carpetArea', 'carpet_area', 'estimated_carpet_area'));
+    setPerSftRate(pickInitialString(d, 'perSftRate', 'per_sft_rate'));
+    setTotalBudget(
+      pickInitialString(d, 'totalBudget', 'total_budget', 'total_d_and_b_budget'),
+    );
+    const deal = pickInitialString(d, 'dealSituation', 'deal_situation');
+    if (deal) {
+      const match = DEAL_SITUATION_OPTIONS.find(
+        (o) =>
+          o.value === deal ||
+          o.label === deal ||
+          o.value.toLowerCase() === deal.toLowerCase(),
+      );
+      if (match) setDealSituation(match.value);
+    }
+    setClientCompany(pickInitialString(d, 'clientCompany', 'client_company'));
+    setContactPerson(pickInitialString(d, 'contactPerson', 'contact_person'));
+    setPhone(pickInitialString(d, 'phone', 'mobile_no', 'mobileNo', 'mobile_number'));
+    setEmail(pickInitialString(d, 'email', 'email_id'));
+    setClientCity(pickInitialString(d, 'clientCity', 'client_city'));
+    setRequirementSummary(
+      pickInitialString(d, 'requirementSummary', 'requirement_summary'),
+    );
+  }, [initialData]);
 
   useEffect(() => {
     let cancelled = false;

@@ -101,7 +101,16 @@ function FieldGroup({ label, required, optional, children, className = '' }) {
   );
 }
 
-const ManagedOfficeLeadForm = () => {
+function pickInitialString(src, ...keys) {
+  if (!src || typeof src !== 'object') return '';
+  for (const k of keys) {
+    const v = src[k];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();
+  }
+  return '';
+}
+
+const ManagedOfficeLeadForm = ({ initialData = null }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const submitStatus = useSelector(selectLeadSubmitStatus);

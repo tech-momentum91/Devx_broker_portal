@@ -97,6 +97,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(() => {
+    void logOutService();
     setUser(null);
     setIsAuthenticated(false);
     setSessionApiSucceeded(false);
