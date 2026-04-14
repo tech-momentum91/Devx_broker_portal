@@ -7,17 +7,26 @@ const initialState = {
   lastCreatedLeadName: null,
 };
 
+function toErrorMessage(error) {
+  if (!error) return 'Failed to submit lead';
+  if (typeof error === 'string') return error;
+  if (typeof error?.message === 'string') return error.message;
+  if (typeof error?.exc === 'string') return error.exc;
+  if (typeof error?.error === 'string') return error.error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return 'Failed to submit lead';
+  }
+}
+
 export const submitLead = createAsyncThunk(
   'leadSubmit/submitLead',
   async (payload, { rejectWithValue }) => {
     try {
       return await submitLeadFromBrokerPortal(payload);
     } catch (error) {
-      const message =
-        error?.response?.data?.message ??
-        error?.response?.data?.exc ??
-        error?.message ??
-        'Failed to submit lead';
+      const message = toErrorMessage(error?.response?.data) || toErrorMessage(error);
       return rejectWithValue(message);
     }
   },

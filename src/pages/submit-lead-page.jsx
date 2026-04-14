@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
 import PageLayout from '@/components/page-layout';
 import ManagedOfficeLeadForm from '@/components/submit-lead/managed-office-lead-form';
@@ -39,7 +40,6 @@ function getServiceTypeFromVoicePayload(payload) {
 function isDesignAndBuildServiceType(serviceRaw) {
   const s = String(serviceRaw ?? '').toLowerCase();
   if (!s) return false;
-  // Matches "Design and Build", "Design & Build", D&B shorthand, etc.
   if (s.includes('design') && s.includes('build')) return true;
   if (/\bd\s*&\s*b\b/i.test(String(serviceRaw ?? ''))) return true;
   return false;
@@ -64,7 +64,6 @@ function normalizeVoiceLeadInitialData(raw) {
   return {
     ...raw,
     ...f,
-    // camelCase aliases (forms often check camelCase first)
     buildingName: pick('building_name', 'buildingName') ?? raw.buildingName,
     carpetArea: pick('carpet_area', 'carpetArea', 'estimated_carpet_area') ?? raw.carpetArea,
     totalBudget: pick('total_budget', 'totalBudget', 'total_d_and_b_budget') ?? raw.totalBudget,

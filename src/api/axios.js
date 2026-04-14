@@ -64,6 +64,7 @@ apiClient.interceptors.response.use(
     // Handle authentication errors selectively
     const status = error.response?.status;
     const isLoginEndpoint = error.config?.url?.includes('/method/login');
+    const isLogoutEndpoint = error.config?.url?.includes('/method/logout');
     const isSessionCheck = error.config?.url?.includes('/method/frappe.auth.get_logged_user');
     const currentPath = window.location.pathname;
     const isPublicRoute = isPublicRoutePath(currentPath);
@@ -83,8 +84,8 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Keep 401 handling for non-login endpoints
-    if (status === 401 && !isLoginEndpoint && !isSessionCheck) {
+    // Keep 401 handling for non-login endpoints (skip logout — caller clears session)
+    if (status === 401 && !isLoginEndpoint && !isLogoutEndpoint && !isSessionCheck) {
       // Only redirect if not already on a public route to prevent infinite loops
       if (!isPublicRoute && handleAuthError(error)) {
         return Promise.reject(error);

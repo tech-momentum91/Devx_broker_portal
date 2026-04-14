@@ -8,9 +8,7 @@ import closeLogo from '@/assets/images/Layer.png';
 import NavItem from '@/components/ui/nav-item';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth-context';
-import { logOutService } from '@/services/auth-service';
-import { useDispatch, useSelector } from 'react-redux';
-import { logoutSuccess } from '@/redux/authSlice';
+import { useSelector } from 'react-redux';
 import * as Badge from '@/components/ui/badge';
 import { upperFirst } from 'lodash';
 import {
@@ -187,7 +185,6 @@ const Sidebar = ({ initialOpen = true }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(initialOpen);
   const location = useLocation();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const { logout: authLogout } = useAuth();
 
   const { profileData } = useSelector((state) => state.profile);
@@ -255,19 +252,10 @@ const Sidebar = ({ initialOpen = true }) => {
     setIsDrawerOpen((previous) => !previous);
   }, []);
 
-  const handleLogout = useCallback(async () => {
-    try {
-      await logOutService();
-      authLogout();
-      dispatch(logoutSuccess());
-      navigate('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-      authLogout();
-      dispatch(logoutSuccess());
-      navigate('/login');
-    }
-  }, [authLogout, dispatch, navigate]);
+  const handleLogout = useCallback(() => {
+    authLogout();
+    navigate('/login', { replace: true });
+  }, [authLogout, navigate]);
 
   const primaryNotificationCount = useMemo(() => {
     const primary = inboxStaticData.primary ?? [];

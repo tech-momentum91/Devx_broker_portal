@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import apiClient from '@/api/axios';
+import { City } from 'country-state-city';
 
 const USE_MOCK = false;
 const MOCK_DELAY_MS = 300;
@@ -436,23 +437,50 @@ function normalizeCityOption(item) {
   return { value: value || label, label: String(label).trim() || value };
 }
 
+function getAllIndiaCityOptions() {
+  const cities = City.getCitiesOfCountry('IN');
+  if (!Array.isArray(cities) || cities.length === 0) return [];
+
+  const seen = new Set();
+  const options = [];
+  cities.forEach((city) => {
+    const label = String(city?.name ?? '').trim();
+    if (!label) return;
+    const key = label.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    options.push({ value: label, label });
+  });
+
+  return options.sort((a, b) => a.label.localeCompare(b.label));
+}
+
 /**
  * Fetch city filter options from API (same as devx_frontend CP contact modal).
  * Uses get_cp_contact_filter_options; falls back to static list if API fails or returns no cities.
  * @returns {Promise<Array<{ value: string, label: string }>>}
  */
 async function fetchCityOptionsFromApi() {
+  const allIndiaCities = getAllIndiaCityOptions();
   try {
     const res = await apiClient.post(CP_CONTACT_FILTER_OPTIONS_API, { centers: [] });
     const data = res?.data?.message ?? res?.data;
     const list = Array.isArray(data?.city) ? data.city : [];
     if (list.length > 0) {
-      return list.map(normalizeCityOption).filter((o) => o.value && o.label);
+      const apiCities = list.map(normalizeCityOption).filter((o) => o.value && o.label);
+      const merged = [...apiCities, ...allIndiaCities];
+      const seen = new Set();
+      return merged.filter((opt) => {
+        const key = String(opt?.label ?? '').trim().toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     }
   } catch {
-    // use static fallback
+    // fallback to full dynamic India city list
   }
-  return DASHBOARD_CITY_OPTIONS;
+  return allIndiaCities.length > 0 ? allIndiaCities : DASHBOARD_CITY_OPTIONS;
 }
 
 /**
@@ -614,7 +642,7 @@ export async function getDashboardStatusOptions() {
  */
 export async function getDashboardCityOptions() {
   try {
-    if (USE_MOCK) return await getCityOptionsMock();
+    //if (USE_MOCK) return await getCityOptionsMock();
     return await fetchCityOptionsFromApi();
   } catch (error) {
     throw new Error(serializeError(error));
@@ -628,6 +656,33 @@ export async function getDashboardCityOptions() {
  */
 export async function getCityOptionsForLeadForm() {
   return getDashboardCityOptions();
+}
+
+/**
+ * Returns client company suggestions for lead forms.
+ * User can still type a new company name not in this list.
+ * @returns {Promise<Array<{ value: string, label: string }>>}
+ */
+export async function getClientCompanyOptionsForLeadForm() {
+  try {
+    const { data } = await apiClient.get(
+      '/method/devx.devx_crm.api.crm_account.get_crm_account_options',
+    );
+    const rows = Array.isArray(data?.message) ? data.message : Array.isArray(data) ? data : [];
+    const seen = new Set();
+    const options = [];
+    rows.forEach((row) => {
+      const label = String(row?.label ?? row?.customer_name ?? row?.value ?? '').trim();
+      if (!label || label === '-') return;
+      const key = label.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push({ value: label, label });
+    });
+    return options.sort((a, b) => a.label.localeCompare(b.label));
+  } catch {
+    return [];
+  }
 }
 
 /**

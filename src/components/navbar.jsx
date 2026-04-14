@@ -31,7 +31,7 @@ const navItems = [
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const initials = useMemo(
     () => getInitials(user?.full_name, user?.email),
     [user?.full_name, user?.email],
@@ -119,7 +119,14 @@ const Navbar = () => {
             </Dropdown.Trigger>
             <Dropdown.Content side='bottom' align='end'>
               <Dropdown.Item onClick={() => navigate('/profile')}>Profile</Dropdown.Item>
-              <Dropdown.Item onClick={() => navigate('/login')}>Logout</Dropdown.Item>
+              <Dropdown.Item
+                onClick={() => {
+                  logout();
+                  navigate('/login', { replace: true });
+                }}
+              >
+                Logout
+              </Dropdown.Item>
             </Dropdown.Content>
           </Dropdown.Root>
         </div>
