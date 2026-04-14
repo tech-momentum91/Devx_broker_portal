@@ -123,7 +123,8 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
   const [area, setArea] = useState('');
   const [timeline, setTimeline] = useState('');
   const [clientCompany, setClientCompany] = useState('');
-  const [isCustomClientCompany, setIsCustomClientCompany] = useState(false);
+  /** `custom` = free-text after "+ Add New Company"; `select` = pick from API list. */
+  const [clientCompanyUiMode, setClientCompanyUiMode] = useState('select');
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -158,31 +159,14 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
     setRequirementSummary(initialData.requirementSummary ?? initialData.requirement_summary ?? '');
   }, [initialData]);
 
+  // In select mode only: move to free-text if the current name is not in the dropdown (e.g. voice).
+  // Never force select while `custom` — user chose "+ Add New Company" and may have empty string.
   useEffect(() => {
-    if (!clientCompany) {
-      setIsCustomClientCompany(false);
-      return;
-    }
+    if (clientCompanyUiMode === 'custom') return;
+    if (!clientCompany?.trim()) return;
     const existsInOptions = clientCompanyOptions.some((opt) => opt.value === clientCompany);
-    setIsCustomClientCompany(!existsInOptions);
-  }, [clientCompany, clientCompanyOptions]);
-
-  useEffect(() => {
-    if (!initialData || typeof initialData !== 'object') return;
-
-    setWorkspaceType(initialData.workspaceType ?? initialData.workspace_type ?? '');
-    setProductType(initialData.productType ?? initialData.product_type ?? '');
-    setSeats(String(initialData.seats ?? initialData.no_of_seats ?? ''));
-    setMicroMarket(initialData.microMarket ?? initialData.micro_market ?? '');
-    setArea(initialData.area ?? '');
-    setTimeline(initialData.timeline ?? initialData.expected_decision_timeline ?? '');
-    setClientCompany(initialData.clientCompany ?? initialData.client_company ?? '');
-    setContactPerson(initialData.contactPerson ?? initialData.contact_person ?? '');
-    setPhone(initialData.phone ?? initialData.mobile_number ?? '');
-    setEmail(initialData.email ?? initialData.email_id ?? '');
-    setCity(initialData.city ?? '');
-    setRequirementSummary(initialData.requirementSummary ?? initialData.requirement_summary ?? '');
-  }, [initialData]);
+    setClientCompanyUiMode(existsInOptions ? 'select' : 'custom');
+  }, [clientCompany, clientCompanyOptions, clientCompanyUiMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -412,8 +396,8 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
           />
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <FieldGroup label="Client Company">
-              {isCustomClientCompany ? (
-                <Input.Root className={inputRootClass}>
+              {clientCompanyUiMode === 'custom' ? (
+                <Input.Root key="client-company-custom" className={inputRootClass}>
                   <Input.Wrapper>
                     <Input.Input
                       autoFocus
@@ -424,7 +408,7 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
                       onBlur={() => {
                         const trimmed = clientCompany.trim();
                         if (!trimmed) {
-                          setIsCustomClientCompany(false);
+                          setClientCompanyUiMode('select');
                         }
                       }}
                     />
@@ -432,14 +416,20 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
                 </Input.Root>
               ) : (
                 <Select.Root
-                  value={clientCompany}
+                  value={
+                    clientCompany &&
+                    clientCompanyOptions.some((opt) => opt.value === clientCompany)
+                      ? clientCompany
+                      : undefined
+                  }
                   onValueChange={(value) => {
                     if (value === '__add_new__') {
-                      setIsCustomClientCompany(true);
+                      setClientCompanyUiMode('custom');
                       setClientCompany('');
                       return;
                     }
                     setClientCompany(value);
+                    setClientCompanyUiMode('select');
                   }}
                 >
                   <Select.Trigger className={inputTriggerClass}>

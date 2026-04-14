@@ -134,7 +134,8 @@ const DesignBuildLeadForm = ({ initialData = null }) => {
   const [totalBudget, setTotalBudget] = useState('');
   const [dealSituation, setDealSituation] = useState('');
   const [clientCompany, setClientCompany] = useState('');
-  const [isCustomClientCompany, setIsCustomClientCompany] = useState(false);
+  /** `custom` = free-text after "+ Add New Company"; `select` = pick from API list. */
+  const [clientCompanyUiMode, setClientCompanyUiMode] = useState('select');
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -194,40 +195,6 @@ const DesignBuildLeadForm = ({ initialData = null }) => {
   }, []);
 
   useEffect(() => {
-    if (!initialData || typeof initialData !== 'object') return;
-
-    setBuildingName(initialData.buildingName ?? initialData.building_name ?? '');
-    setCity(initialData.city ?? '');
-    setFloor(initialData.floor ?? '');
-    setUnitNumber(initialData.unitNumber ?? initialData.unit_number ?? '');
-    setMicroMarket(initialData.microMarket ?? initialData.micro_market ?? '');
-    setCarpetArea(
-      String(
-        initialData.carpetArea ??
-          initialData.carpet_area ??
-          initialData.estimated_carpet_area ??
-          '',
-      ),
-    );
-    setPerSftRate(String(initialData.perSftRate ?? initialData.per_sft_rate ?? ''));
-    setTotalBudget(
-      String(
-        initialData.totalBudget ??
-          initialData.total_budget ??
-          initialData.total_d_and_b_budget ??
-          '',
-      ),
-    );
-    setDealSituation(initialData.dealSituation ?? initialData.deal_situation ?? '');
-    setClientCompany(initialData.clientCompany ?? initialData.client_company ?? '');
-    setContactPerson(initialData.contactPerson ?? initialData.contact_person ?? '');
-    setPhone(initialData.phone ?? initialData.mobile_number ?? '');
-    setEmail(initialData.email ?? initialData.email_id ?? '');
-    setClientCity(initialData.clientCity ?? initialData.client_city ?? initialData.city ?? '');
-    setRequirementSummary(initialData.requirementSummary ?? initialData.requirement_summary ?? '');
-  }, [initialData]);
-
-  useEffect(() => {
     let cancelled = false;
     getClientCompanyOptionsForLeadForm()
       .then((opts) => {
@@ -241,34 +208,14 @@ const DesignBuildLeadForm = ({ initialData = null }) => {
     };
   }, []);
 
+  // In select mode only: move to free-text if the current name is not in the dropdown (e.g. voice).
+  // Never force select while `custom` — user chose "+ Add New Company" and may have empty string.
   useEffect(() => {
-    if (!initialData || typeof initialData !== 'object') return;
-
-    setBuildingName(initialData.buildingName ?? initialData.building_name ?? '');
-    setCity(initialData.city ?? '');
-    setFloor(initialData.floor ?? '');
-    setUnitNumber(initialData.unitNumber ?? initialData.unit_number ?? '');
-    setMicroMarket(initialData.microMarket ?? initialData.micro_market ?? '');
-    setCarpetArea(String(initialData.carpetArea ?? initialData.estimated_carpet_area ?? ''));
-    setPerSftRate(String(initialData.perSftRate ?? initialData.per_sft_rate ?? ''));
-    setTotalBudget(String(initialData.totalBudget ?? initialData.total_d_and_b_budget ?? ''));
-    setDealSituation(initialData.dealSituation ?? initialData.deal_situation ?? '');
-    setClientCompany(initialData.clientCompany ?? initialData.client_company ?? '');
-    setContactPerson(initialData.contactPerson ?? initialData.contact_person ?? '');
-    setPhone(initialData.phone ?? initialData.mobile_number ?? '');
-    setEmail(initialData.email ?? initialData.email_id ?? '');
-    setClientCity(initialData.clientCity ?? initialData.client_city ?? initialData.city ?? '');
-    setRequirementSummary(initialData.requirementSummary ?? initialData.requirement_summary ?? '');
-  }, [initialData]);
-
-  useEffect(() => {
-    if (!clientCompany) {
-      setIsCustomClientCompany(false);
-      return;
-    }
+    if (clientCompanyUiMode === 'custom') return;
+    if (!clientCompany?.trim()) return;
     const existsInOptions = clientCompanyOptions.some((opt) => opt.value === clientCompany);
-    setIsCustomClientCompany(!existsInOptions);
-  }, [clientCompany, clientCompanyOptions]);
+    setClientCompanyUiMode(existsInOptions ? 'select' : 'custom');
+  }, [clientCompany, clientCompanyOptions, clientCompanyUiMode]);
 
   useEffect(() => {
     if (submitStatus === 'succeeded') {
@@ -570,8 +517,9 @@ const DesignBuildLeadForm = ({ initialData = null }) => {
         >
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <FieldGroup label="Client Company" required>
-              {isCustomClientCompany ? (
+              {clientCompanyUiMode === 'custom' ? (
                 <Input.Root
+                  key="client-company-custom"
                   className="rounded-lg bg-bg-white-0 before:ring-stroke-soft-200"
                   hasError={Boolean(validationErrors.clientCompany)}
                 >
@@ -588,7 +536,7 @@ const DesignBuildLeadForm = ({ initialData = null }) => {
                       onBlur={() => {
                         const trimmed = clientCompany.trim();
                         if (!trimmed) {
-                          setIsCustomClientCompany(false);
+                          setClientCompanyUiMode('select');
                         }
                       }}
                     />
@@ -596,14 +544,20 @@ const DesignBuildLeadForm = ({ initialData = null }) => {
                 </Input.Root>
               ) : (
                 <Select.Root
-                  value={clientCompany}
+                  value={
+                    clientCompany &&
+                    clientCompanyOptions.some((opt) => opt.value === clientCompany)
+                      ? clientCompany
+                      : undefined
+                  }
                   onValueChange={(value) => {
                     if (value === '__add_new__') {
-                      setIsCustomClientCompany(true);
+                      setClientCompanyUiMode('custom');
                       setClientCompany('');
                       return;
                     }
                     setClientCompany(value);
+                    setClientCompanyUiMode('select');
                     setValidationErrors((prev) => ({ ...prev, clientCompany: undefined }));
                   }}
                 >
