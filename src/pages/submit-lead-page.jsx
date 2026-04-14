@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo} from 'react';
 import { useLocation } from 'react-router-dom';
 import PageLayout from '@/components/page-layout';
 import ManagedOfficeLeadForm from '@/components/submit-lead/managed-office-lead-form';
@@ -164,6 +164,8 @@ const SubmitLeadPage = () => {
         </div>
 
         <div className="mt-4">
+          
+
           {!activeTab && (
             <div className="rounded-xl border border-stroke-soft-200 bg-bg-white-0 p-8 text-center text-text-sub-500">
               Select a service type above to continue.
