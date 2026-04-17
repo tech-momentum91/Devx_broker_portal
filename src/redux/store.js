@@ -14,6 +14,7 @@ import dashboardReducer from '@/redux/dashboardSlice';
 import leadSubmitReducer from '@/redux/leadSubmitSlice';
 import brokerDashboardReducer from '@/redux/brokerDashboardSlice';
 import recentSubmissionsReducer from '@/redux/recentSubmissionsSlice';
+import voiceTicketReducer from '@/redux/voiceTicketSlice';
 
 const appReducer = combineReducers({
   auth: authReducer,
@@ -31,6 +32,7 @@ const appReducer = combineReducers({
   leadSubmit: leadSubmitReducer,
   brokerDashboard: brokerDashboardReducer,
   recentSubmissions: recentSubmissionsReducer,
+  voiceTicket: voiceTicketReducer,
 });
 
 // Reset redux state to initial values on logout to avoid leaking user data
