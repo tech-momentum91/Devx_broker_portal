@@ -7,7 +7,7 @@ import { store } from '@/redux/store';
 import { Toaster } from '@/components/ui/toast';
 import routes from './routes';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import { AuthProvider } from './contexts/auth-context';
+import { AuthProvider } from '@/contexts/auth-context';
 /**
  * Loading fallback component for lazy-loaded routes
  */
@@ -31,16 +31,16 @@ function AppRoutes() {
 function Root() {
   return (
     <Provider store={store}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <AuthProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <BrowserRouter>
             <Suspense fallback={<LoadingFallback />}>
               <AppRoutes />
             </Suspense>
             <Toaster />
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </Provider>
   );
 }

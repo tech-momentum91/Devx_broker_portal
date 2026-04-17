@@ -1,11 +1,9 @@
 import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { useAuth } from '../contexts/auth-context';
+import { useAuth } from '@/contexts/auth-context';
 import * as Button from '@/components/ui/button';
 import { RiAlertFill } from 'react-icons/ri';
-import { fetchCenterAccess, selectCenterAccess } from '@/redux/centerSlice';
-import { showErrorToast } from '@/utils/error-utils';
+import { popPostLoginRedirectPath } from '@/utils/auth-utils';
 /**
  * ProtectedRoute component for handling route authentication
  *
@@ -21,10 +19,13 @@ import { showErrorToast } from '@/utils/error-utils';
  * - Redirects to /settings if user authenticated but trying to access login
  */
 const ProtectedRoute = ({ children, requireAuth = true }) => {
-  const dispatch = useDispatch();
-  const { isAuthenticated, loading: authLoading, sessionApiError, refreshSession } = useAuth();
+  const {
+    isAuthenticated,
+    loading: authLoading,
+    sessionApiError,
+    refreshSession,
+  } = useAuth();
   const location = useLocation();
-  const centerAccess = useSelector(selectCenterAccess);
 
   // Trigger session check when component mounts (only for routes that use ProtectedRoute)
   // Only check if we haven't checked yet to avoid unnecessary API calls
@@ -38,39 +39,13 @@ const ProtectedRoute = ({ children, requireAuth = true }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once per route mount
 
-  // Ensure center access data is available before rendering protected content
-  useEffect(() => {
-    if (!requireAuth) return;
-    if (!isAuthenticated || authLoading) return;
-
-    if (centerAccess.status === 'idle') {
-      const fetchCenterAccessAPI = async () => {
-        const result = await dispatch(fetchCenterAccess());
-        if (result.type === 'center/getCenterList/rejected') {
-          showErrorToast(result.payload);
-          console.error('Error fetching center access:', result.payload);
-        }
-      };
-      if (centerAccess.status === 'idle') {
-        fetchCenterAccessAPI();
-      }
-    }
-  }, [requireAuth, isAuthenticated, authLoading, centerAccess.status, dispatch]);
-
-  const isCenterAccessLoading =
-    requireAuth &&
-    isAuthenticated &&
-    (centerAccess.status === 'idle' || centerAccess.status === 'loading');
-
-  // Show loader while checking authentication or loading center access
-  if (authLoading || isCenterAccessLoading) {
+  // Show loader while checking authentication
+  if (authLoading) {
     return (
       <div className='h-screen w-full flex items-center justify-center bg-(--color-bg-weak-50)'>
         <div className='flex flex-col items-center gap-4'>
           <div className='w-8 h-8 border-4 border-(--color-primary-base) border-t-transparent rounded-full animate-spin' />
-          <p className='text-(--color-text-sub-500)'>
-            {authLoading ? 'Verifying session...' : 'Loading center access...'}
-          </p>
+          <p className='text-(--color-text-sub-500)'>Verifying session...</p>
         </div>
       </div>
     );
@@ -103,7 +78,8 @@ const ProtectedRoute = ({ children, requireAuth = true }) => {
 
   // If route is login page and user is already authenticated
   if (!requireAuth && isAuthenticated) {
-    return <Navigate to='/dashboard' replace />;
+    const redirectPath = popPostLoginRedirectPath();
+    return <Navigate to={redirectPath || '/dashboard'} replace />;
   }
 
   return <>{children}</>;

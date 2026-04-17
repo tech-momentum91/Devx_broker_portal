@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { handleAuthError } from '../utils/auth-utils';
+import { handleAuthError, isSessionExpired403Error } from '../utils/auth-utils';
 import { serializeError } from '../utils/error-utils';
 
 // Create axios instance with default configuration
@@ -69,24 +69,23 @@ apiClient.interceptors.response.use(
     const currentPath = window.location.pathname;
     const isPublicRoute = isPublicRoutePath(currentPath);
 
-    // Handle 403 for session check endpoint - redirect to login
-    if (status === 403 && isSessionCheck) {
-      // Only redirect if not already on a public route to prevent infinite loops
-      if (!isPublicRoute && handleAuthError(error)) {
+    // Session probe: let auth-service + AuthProvider handle outcomes.
+    if ((status === 403 || status === 401) && isSessionCheck) {
+      return Promise.reject(error);
+    }
+
+    // Handle 403 for other endpoints:
+    // - redirect only for session-expired shaped 403 payloads
+    // - keep normal permission-denied 403 as reject only
+    if (status === 403 && !isSessionCheck) {
+      if (!isPublicRoute && isSessionExpired403Error(error) && handleAuthError(error)) {
         return Promise.reject(error);
       }
       return Promise.reject(error);
     }
 
-    // Handle 403 for other endpoints (not session check) - just reject, no redirect
-    if (status === 403 && !isSessionCheck) {
-      // Don't redirect for permission errors on other APIs
-      return Promise.reject(error);
-    }
-
     // Keep 401 handling for non-login endpoints (skip logout — caller clears session)
     if (status === 401 && !isLoginEndpoint && !isLogoutEndpoint && !isSessionCheck) {
-      // Only redirect if not already on a public route to prevent infinite loops
       if (!isPublicRoute && handleAuthError(error)) {
         return Promise.reject(error);
       }

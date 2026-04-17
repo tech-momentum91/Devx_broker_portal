@@ -23,6 +23,8 @@ import { loginService, logOutService } from '@/services/auth-service';
 import { loginSuccess, setError, clearError, getUserSidebarPerm, logoutSuccess } from '@/redux/authSlice';
 import { getProfile } from '@/redux/profileSlice';
 import { hasBrokerRole } from '@/utils/broker-role';
+import { showErrorToast } from '@/utils/error-utils';
+import { SESSION_EXPIRED_TOAST_KEY, popPostLoginRedirectPath } from '@/utils/auth-utils';
 
 const loginSchema = z.object({
   email: z
@@ -45,6 +47,14 @@ function Login() {
   useEffect(() => {
     dispatch(clearError());
   }, [dispatch]);
+
+  useEffect(() => {
+    const shouldShowSessionExpiredToast = sessionStorage.getItem(SESSION_EXPIRED_TOAST_KEY) === '1';
+    if (!shouldShowSessionExpiredToast) return;
+
+    showErrorToast('Session expired. Please log in again.');
+    sessionStorage.removeItem(SESSION_EXPIRED_TOAST_KEY);
+  }, []);
 
   const {
     register,
@@ -107,7 +117,8 @@ function Login() {
           console.error('Failed to fetch sidebar permissions:', err);
         }
 
-        navigate('/dashboard', { replace: true });
+        const nextPath = popPostLoginRedirectPath() || '/dashboard';
+        navigate(nextPath, { replace: true });
       }
     } catch (err) {
       console.error('Login error', err);

@@ -167,9 +167,8 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        // No valid server session found (403/401 or Guest user)
-        // Important: Do NOT fallback to localStorage when server explicitly says no session
-        // This ensures security - if server session expired, user must re-authenticate
+        // No valid server session (403/401 swallowed by getSession, or Guest): do not use
+        // cached localStorage — same as devx_frontend; user must sign in again.
         console.log('No valid server session, logging out user');
         logout();
       } catch (error) {

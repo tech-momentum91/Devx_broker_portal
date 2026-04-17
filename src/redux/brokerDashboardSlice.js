@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { getBrokerDashboardSummary } from '@/services/broker-dashboard-service';
+import { parseAsyncListReject } from '@/redux/asyncRejectionUtils';
 
 const initialState = {
   summary: {
@@ -37,9 +38,14 @@ const brokerDashboardSlice = createSlice({
       })
       .addCase(fetchBrokerDashboardSummary.rejected, (state, action) => {
         state.summary.isLoading = false;
-        state.summary.data = null;
-        state.summary.error =
-          action.payload ?? action.error?.message ?? 'Failed to load dashboard';
+        const { message, clearCachedData } = parseAsyncListReject(
+          action,
+          'Failed to load dashboard',
+        );
+        state.summary.error = message;
+        if (clearCachedData) {
+          state.summary.data = null;
+        }
       });
   },
 });

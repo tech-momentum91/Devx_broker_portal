@@ -5,6 +5,7 @@ import {
   getLeadSubmissions,
   getCrmStagesForExternal,
 } from '@/services/dashboard-service';
+import { parseAsyncListReject } from '@/redux/asyncRejectionUtils';
 
 const initialState = {
   filterOptions: {
@@ -130,9 +131,15 @@ const dashboardSlice = createSlice({
       })
       .addCase(fetchLeadSubmissions.rejected, (state, action) => {
         state.submissions.isLoading = false;
-        state.submissions.error = action.payload ?? action.error?.message ?? 'Failed to load submissions';
-        state.submissions.data = [];
-        state.submissions.summary = null;
+        const { message, clearCachedData } = parseAsyncListReject(
+          action,
+          'Failed to load submissions',
+        );
+        state.submissions.error = message;
+        if (clearCachedData) {
+          state.submissions.data = [];
+          state.submissions.summary = null;
+        }
       })
       .addCase(fetchCrmStagesForExternal.pending, (state) => {
         state.externalCrmStages.isLoading = true;
@@ -145,8 +152,11 @@ const dashboardSlice = createSlice({
       })
       .addCase(fetchCrmStagesForExternal.rejected, (state, action) => {
         state.externalCrmStages.isLoading = false;
-        state.externalCrmStages.error = action.payload ?? action.error?.message ?? 'Failed to load stages';
-        state.externalCrmStages.data = [];
+        const { message, clearCachedData } = parseAsyncListReject(action, 'Failed to load stages');
+        state.externalCrmStages.error = message;
+        if (clearCachedData) {
+          state.externalCrmStages.data = [];
+        }
       });
   },
 });

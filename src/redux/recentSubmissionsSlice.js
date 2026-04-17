@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { getRecentSubmissions } from '@/services/recent-submissions-service';
+import { parseAsyncListReject } from '@/redux/asyncRejectionUtils';
 
 const initialState = {
   data: [],
@@ -35,9 +36,14 @@ const recentSubmissionsSlice = createSlice({
       })
       .addCase(fetchRecentSubmissions.rejected, (state, action) => {
         state.isLoading = false;
-        state.data = [];
-        state.error =
-          action.payload ?? action.error?.message ?? 'Failed to load recent submissions';
+        const { message, clearCachedData } = parseAsyncListReject(
+          action,
+          'Failed to load recent submissions',
+        );
+        state.error = message;
+        if (clearCachedData) {
+          state.data = [];
+        }
       });
   },
 });

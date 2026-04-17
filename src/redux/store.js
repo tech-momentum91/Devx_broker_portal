@@ -2,7 +2,6 @@ import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import authReducer, { logoutSuccess } from '@/redux/authSlice';
 import uiReducer from '@/redux/uiSlice';
 import profileReducer from '@/redux/profileSlice';
-import centerReducer from '@/redux/centerSlice';
 import landlordReducer from '@/redux/landlordSlice';
 import clientReducer from '@/redux/clientSlice';
 import clientDetailReducer from '@/redux/clientDetailSlice';
@@ -20,7 +19,6 @@ const appReducer = combineReducers({
   auth: authReducer,
   ui: uiReducer,
   profile: profileReducer,
-  center: centerReducer,
   landlord: landlordReducer,
   client: clientReducer,
   clientDetail: clientDetailReducer,
