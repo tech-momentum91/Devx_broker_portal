@@ -5,6 +5,19 @@
 
 import apiClient from '@/api/axios';
 
+/**
+ * CRM Lead Product options for Manage Office workspace dropdown (CRM Lead.product Link).
+ * @returns {Promise<Array<{ value: string, label: string }>>}
+ */
+export async function getCrmLeadProductsForBrokerPortal() {
+  const response = await apiClient.post(
+    '/method/devx.channel_partner.api.lead.get_crm_lead_products_for_broker_portal',
+    {},
+  );
+  const msg = response?.data?.message;
+  return Array.isArray(msg) ? msg : [];
+}
+
 function extractErrorMessage(body) {
   if (!body) return '';
   if (typeof body === 'string') return body;

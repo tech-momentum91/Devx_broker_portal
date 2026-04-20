@@ -26,7 +26,7 @@ const Dashboard = () => {
   const [appliedFilters, setAppliedFilters] = useState(() =>
     getDefaultDashboardFilterLocalFilters({}),
   );
-
+  console.log("submissions", submissions)
   const handleTabChange = useCallback((value) => {
     setActiveTab(value);
   }, []);

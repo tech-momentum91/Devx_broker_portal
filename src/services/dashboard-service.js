@@ -143,6 +143,7 @@ export function normalizeLeadSubmission(item) {
       null,
     budget: formatBudgetDisplay(budgetRaw) ?? null,
     dealValue: formatBudgetDisplay(dealValueRaw) ?? null,
+    workspace_requirement_type: item.workspace_requirement_type ?? item.product ?? '-',
   };
 }
 

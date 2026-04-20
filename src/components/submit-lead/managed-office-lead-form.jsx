@@ -18,14 +18,8 @@ import {
   getCityOptionsForLeadForm,
   getClientCompanyOptionsForLeadForm,
 } from '@/services/dashboard-service';
+import { getCrmLeadProductsForBrokerPortal } from '@/services/lead-submit-service';
 import { showErrorToast } from '@/utils/error-utils';
-
-const WORKSPACE_TYPES = [
-  { value: 'managed_office', label: 'Managed Office' },
-  { value: 'coworking', label: 'Coworking Space' },
-  { value: 'hot_desk', label: 'Hot Desk' },
-  { value: 'private_office', label: 'Private Office' },
-];
 
 const COWORKING_PRODUCTS = [
   { value: 'hot_desk', label: 'Hot Desk' },
@@ -33,6 +27,14 @@ const COWORKING_PRODUCTS = [
   { value: 'dedicated_desk', label: 'Dedicated Desk' },
   { value: 'team_space', label: 'Team Space' },
 ];
+
+/** Legacy form values -> CRM Lead Product.name when ERP uses title as doc name */
+const LEGACY_WORKSPACE_SLUG_TO_PRODUCT_NAME = {
+  managed_office: 'Managed Office',
+  coworking: 'Coworking Space',
+  hot_desk: 'Hot Desk',
+  private_office: 'Private Office',
+};
 
 const DECISION_TIMELINES = [
   { value: '1_month', label: 'Within 1 month' },
@@ -48,7 +50,8 @@ const managedOfficeSchema = z
     seats: z.string().trim().min(1, 'Number of Seats is required.'),
   })
   .superRefine((data, ctx) => {
-    if (data.workspaceType === 'coworking' && !data.productType?.trim()) {
+    const wt = (data.workspaceType || '').toLowerCase();
+    if (wt.includes('coworking') && !data.productType?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Product Type is required for Coworking workspace.',
@@ -132,15 +135,31 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
   const [requirementSummary, setRequirementSummary] = useState('');
   const [cityOptions, setCityOptions] = useState([]);
   const [clientCompanyOptions, setClientCompanyOptions] = useState([]);
+  const [workspaceProductOptions, setWorkspaceProductOptions] = useState([]);
+  const [workspaceOptionsLoading, setWorkspaceOptionsLoading] = useState(true);
   const [validationErrors, setValidationErrors] = useState({});
+
+  const selectedWorkspaceLabel =
+    workspaceProductOptions.find((o) => o.value === workspaceType)?.label ?? '';
+  const showProductType = selectedWorkspaceLabel.toLowerCase().includes('coworking');
 
   useEffect(() => {
     dispatch(resetSubmitState());
   }, [dispatch]);
 
   useEffect(() => {
-    if (workspaceType !== 'coworking') setProductType('');
-  }, [workspaceType]);
+    if (!showProductType) setProductType('');
+  }, [showProductType]);
+
+  /** When CRM Lead Product options load, map old slug `workspaceType` to Link name if needed */
+  useEffect(() => {
+    if (!workspaceProductOptions.length || !workspaceType) return;
+    if (workspaceProductOptions.some((o) => o.value === workspaceType)) return;
+    const mapped = LEGACY_WORKSPACE_SLUG_TO_PRODUCT_NAME[workspaceType];
+    if (mapped && workspaceProductOptions.some((o) => o.value === mapped)) {
+      setWorkspaceType(mapped);
+    }
+  }, [workspaceProductOptions, workspaceType]);
 
   useEffect(() => {
     if (!initialData || typeof initialData !== 'object') return;
@@ -167,6 +186,24 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
     const existsInOptions = clientCompanyOptions.some((opt) => opt.value === clientCompany);
     setClientCompanyUiMode(existsInOptions ? 'select' : 'custom');
   }, [clientCompany, clientCompanyOptions, clientCompanyUiMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setWorkspaceOptionsLoading(true);
+    getCrmLeadProductsForBrokerPortal()
+      .then((opts) => {
+        if (!cancelled && Array.isArray(opts)) setWorkspaceProductOptions(opts);
+      })
+      .catch(() => {
+        if (!cancelled) setWorkspaceProductOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setWorkspaceOptionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -255,10 +292,10 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
     email,
     city,
     requirementSummary,
+    showProductType,
   ]);
 
   const isSubmitting = submitStatus === 'loading';
-  const showProductType = workspaceType === 'coworking';
 
   const inputTriggerClass = 'w-full bg-bg-white-0 rounded-lg ring-1 ring-stroke-soft-200';
   const inputRootClass = 'rounded-lg bg-bg-white-0 before:ring-stroke-soft-200';
@@ -281,15 +318,24 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
                   setWorkspaceType(value);
                   setValidationErrors((prev) => ({ ...prev, workspaceType: undefined }));
                 }}
+                disabled={workspaceOptionsLoading || workspaceProductOptions.length === 0}
               >
                 <Select.Trigger
                   className={inputTriggerClass}
                   hasError={Boolean(validationErrors.workspaceType)}
                 >
-                  <Select.Value placeholder="Select type…" />
+                  <Select.Value
+                    placeholder={
+                      workspaceOptionsLoading
+                        ? 'Loading…'
+                        : workspaceProductOptions.length === 0
+                          ? 'No options available'
+                          : 'Select type…'
+                    }
+                  />
                 </Select.Trigger>
                 <Select.Content>
-                  {WORKSPACE_TYPES.map((opt) => (
+                  {workspaceProductOptions.map((opt) => (
                     <Select.Item key={opt.value} value={opt.value}>
                       {opt.label}
                     </Select.Item>

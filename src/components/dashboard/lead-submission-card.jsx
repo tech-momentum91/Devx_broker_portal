@@ -47,6 +47,7 @@ const LeadSubmissionCard = ({ submission, crmStages, className, onViewDetails })
     status,
     budget,
     dealValue,
+    workspace_requirement_type,
   } = submission;
 
   const designBuild = isDesignBuild(serviceType);
@@ -86,7 +87,7 @@ const LeadSubmissionCard = ({ submission, crmStages, className, onViewDetails })
           <p className="truncate text-label-lg font-semibold text-text-main-900">{companyName}</p>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-label-xs text-text-sub-500">
             <span className="inline-flex shrink-0 rounded-md bg-success-lighter px-2 py-0.5 font-medium text-success-darker">
-              {serviceType}
+              {workspace_requirement_type}
             </span>
             <span className="flex min-w-0 items-center gap-1 truncate">
               <RiMapPinLine className="size-3.5 shrink-0 text-text-soft-400" />
