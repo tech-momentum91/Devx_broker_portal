@@ -50,9 +50,12 @@ export const SUBMISSION_SERVICE_TYPE = {
   DESIGN_BUILD: 'Design & Build',
 };
 
-/** CRM stages API – returns only stages where apply_to_external is true */
+/** CRM stages API – optional `pipeline` = CRM Stages Pipeline document name */
 const CRM_STAGES_API =
   '/method/devx.devx_crm.doctype.crm_status_master.crm_status_master.get_crm_stages';
+
+const CRM_STAGES_ALL_PIPELINES_API =
+  '/method/devx.devx_crm.doctype.crm_status_master.crm_status_master.get_crm_stages_all_pipelines';
 
 // ---------------------------------------------------------------------------
 // Error handling – consistent shape for Redux rejectWithValue
@@ -144,6 +147,8 @@ export function normalizeLeadSubmission(item) {
     budget: formatBudgetDisplay(budgetRaw) ?? null,
     dealValue: formatBudgetDisplay(dealValueRaw) ?? null,
     workspace_requirement_type: item.workspace_requirement_type ?? item.product ?? '-',
+    /** CRM Stages Pipeline doc name for get_crm_stages */
+    pipelineId: item.pipeline_id ?? item.pipeline?.pipeline_id ?? null,
   };
 }
 
@@ -563,21 +568,47 @@ async function fetchLeadSubmissionsFromApi({ tab = 'managed', filters = {} } = {
   };
 }
 
+function isCrmStageApplyToExternal(item) {
+  const v = item?.apply_to_external;
+  return v === true || v === 1 || v === '1' || String(v).toLowerCase() === 'true';
+}
+
+/** Stages with apply_to_external, ordered by stage_index. */
+function filterStagesForBrokerExternal(list) {
+  const arr = Array.isArray(list) ? list : [];
+  return arr
+    .filter(isCrmStageApplyToExternal)
+    .sort((a, b) => (a?.stage_index ?? 0) - (b?.stage_index ?? 0));
+}
+
 /**
  * Fetches CRM stages and returns only those with apply_to_external = true.
- * For use in broker portal lead progress bar (only external-facing stages).
+ * @param {string|null|undefined} pipeline - CRM Stages Pipeline document name (same as CRM Lead.pipeline)
  * @returns {Promise<Array<{ name, stage, stage_index, color, apply_to_external, crm_stage_status }>>}
  */
-export async function getCrmStagesForExternal() {
-  const res = await apiClient.post(CRM_STAGES_API, {});
+export async function getCrmStagesForExternal(pipeline) {
+  const pid = pipeline != null && String(pipeline).trim() !== '' ? String(pipeline).trim() : undefined;
+  const res = await apiClient.post(CRM_STAGES_API, pid ? { pipeline: pid } : {});
   const raw = res?.data?.message ?? res?.data;
-  const list = Array.isArray(raw) ? raw : [];
-  const isApplyToExternal = (item) => {
-    const v = item?.apply_to_external;
-    return v === true || v === 1 || v === '1' || String(v).toLowerCase() === 'true';
-  };
-  const filtered = list.filter(isApplyToExternal);
-  return filtered.sort((a, b) => (a?.stage_index ?? 0) - (b?.stage_index ?? 0));
+  return filterStagesForBrokerExternal(raw);
+}
+
+/**
+ * One request: all pipelines with full stage docs; returns map pipeline doc name → external stages.
+ * @returns {Promise<Record<string, Array>>}
+ */
+export async function getCrmStagesAllPipelinesForExternal() {
+  const res = await apiClient.post(CRM_STAGES_ALL_PIPELINES_API, {});
+  const raw = res?.data?.message ?? res?.data;
+  const pipelines = Array.isArray(raw) ? raw : [];
+  /** @type {Record<string, unknown[]>} */
+  const byPipeline = {};
+  for (const pl of pipelines) {
+    const id = pl?.name;
+    if (!id) continue;
+    byPipeline[id] = filterStagesForBrokerExternal(pl.stages);
+  }
+  return byPipeline;
 }
 
 // ---------------------------------------------------------------------------
@@ -754,6 +785,9 @@ export function normalizeLeadDetail(raw) {
     milestoneMeetingDone: raw.milestone_meeting_done ?? false,
     milestoneRequirementsReceived: raw.milestone_requirements_received ?? false,
     milestoneLOISigned: raw.milestone_loi_signed ?? false,
+    /** From get_lead_by_id: pipeline progress + pipeline_id for stage API */
+    pipeline:
+      raw.pipeline && typeof raw.pipeline === 'object' ? raw.pipeline : null,
   };
 }
 

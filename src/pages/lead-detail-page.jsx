@@ -318,12 +318,17 @@ const LeadDetailPage = () => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([getLeadById(id), getCrmStagesForExternal()])
-      .then(([data, stages]) => {
-        if (!cancelled) {
-          setDetail(data);
-          setCrmStages(Array.isArray(stages) ? stages : []);
-          setError(null);
+    getLeadById(id)
+      .then(async (data) => {
+        if (cancelled) return;
+        setDetail(data);
+        setError(null);
+        const pipelineId = data?.pipeline?.pipeline_id;
+        try {
+          const stages = await getCrmStagesForExternal(pipelineId);
+          if (!cancelled) setCrmStages(Array.isArray(stages) ? stages : []);
+        } catch {
+          if (!cancelled) setCrmStages([]);
         }
       })
       .catch((err) => {

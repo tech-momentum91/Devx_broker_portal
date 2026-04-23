@@ -8,32 +8,37 @@ import DashboardStatusTabs from '@/components/dashboard-status-tabs';
 import { LeadSubmissionCard } from '@/components/dashboard';
 import VoiceModal from '@/components/submit-lead/voice-modal';
 import { getDefaultDashboardFilterLocalFilters } from '@/constants/dashboard-filter-constants';
-import {
-  fetchLeadSubmissions,
-  fetchCrmStagesForExternal,
-  selectSubmissions,
-  selectExternalCrmStages,
-} from '@/redux/dashboardSlice';
+import { getCrmStagesAllPipelinesForExternal } from '@/services/dashboard-service';
+import { fetchLeadSubmissions, selectSubmissions } from '@/redux/dashboardSlice';
 import { RiArrowRightSLine, RiMicLine, RiStackLine } from 'react-icons/ri';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const submissions = useSelector(selectSubmissions);
-  const externalCrmStages = useSelector(selectExternalCrmStages);
+  const [stagesByPipeline, setStagesByPipeline] = useState({});
   const [activeTab, setActiveTab] = useState('managed');
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState(() =>
     getDefaultDashboardFilterLocalFilters({}),
   );
-  console.log("submissions", submissions)
   const handleTabChange = useCallback((value) => {
     setActiveTab(value);
   }, []);
 
   useEffect(() => {
-    dispatch(fetchCrmStagesForExternal());
-  }, [dispatch]);
+    let cancelled = false;
+    getCrmStagesAllPipelinesForExternal()
+      .then((map) => {
+        if (!cancelled && map && typeof map === 'object') setStagesByPipeline(map);
+      })
+      .catch(() => {
+        if (!cancelled) setStagesByPipeline({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     dispatch(
@@ -134,7 +139,9 @@ const Dashboard = () => {
                 <li key={item.id}>
                   <LeadSubmissionCard
                     submission={item}
-                    crmStages={externalCrmStages.data}
+                    crmStages={
+                      item.pipelineId ? (stagesByPipeline[item.pipelineId] ?? []) : []
+                    }
                     onViewDetails={handleViewDetails}
                   />
                 </li>

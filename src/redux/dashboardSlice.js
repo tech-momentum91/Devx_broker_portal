@@ -3,7 +3,6 @@ import {
   getDashboardStatusOptions,
   getDashboardCityOptions,
   getLeadSubmissions,
-  getCrmStagesForExternal,
 } from '@/services/dashboard-service';
 import { parseAsyncListReject } from '@/redux/asyncRejectionUtils';
 
@@ -22,12 +21,6 @@ const initialState = {
     designCount: 0,
     /** Dashboard summary counts from get_leads_for_cp_contact (Managed Office + Design & Build cards) */
     summary: null,
-  },
-  /** CRM stages with apply_to_external = true, for lead progress bar */
-  externalCrmStages: {
-    data: [],
-    isLoading: false,
-    error: null,
   },
 };
 
@@ -71,25 +64,6 @@ export const fetchLeadSubmissions = createAsyncThunk(
         typeof payload === 'string'
           ? payload
           : payload?.message ?? payload?.exc ?? 'Failed to load submissions';
-      return rejectWithValue(message);
-    }
-  },
-);
-
-/**
- * Fetches CRM stages where apply_to_external is true (for broker portal lead progress bar).
- */
-export const fetchCrmStagesForExternal = createAsyncThunk(
-  'dashboard/fetchCrmStagesForExternal',
-  async (_, { rejectWithValue }) => {
-    try {
-      return await getCrmStagesForExternal();
-    } catch (error) {
-      const payload = error?.response?.data ?? error?.message ?? error;
-      const message =
-        typeof payload === 'string'
-          ? payload
-          : payload?.message ?? payload?.exc ?? 'Failed to load stages';
       return rejectWithValue(message);
     }
   },
@@ -140,23 +114,6 @@ const dashboardSlice = createSlice({
           state.submissions.data = [];
           state.submissions.summary = null;
         }
-      })
-      .addCase(fetchCrmStagesForExternal.pending, (state) => {
-        state.externalCrmStages.isLoading = true;
-        state.externalCrmStages.error = null;
-      })
-      .addCase(fetchCrmStagesForExternal.fulfilled, (state, action) => {
-        state.externalCrmStages.isLoading = false;
-        state.externalCrmStages.error = null;
-        state.externalCrmStages.data = Array.isArray(action.payload) ? action.payload : [];
-      })
-      .addCase(fetchCrmStagesForExternal.rejected, (state, action) => {
-        state.externalCrmStages.isLoading = false;
-        const { message, clearCachedData } = parseAsyncListReject(action, 'Failed to load stages');
-        state.externalCrmStages.error = message;
-        if (clearCachedData) {
-          state.externalCrmStages.data = [];
-        }
       });
   },
 });
@@ -181,10 +138,3 @@ export const selectSubmissions = (state) =>
 
 /** Dashboard summary for Managed Office + Design & Build cards (from get_leads_for_cp_contact). */
 export const selectDashboardSummary = (state) => state.dashboard?.submissions?.summary ?? null;
-
-export const selectExternalCrmStages = (state) =>
-  state.dashboard?.externalCrmStages ?? {
-    data: [],
-    isLoading: false,
-    error: null,
-  };
