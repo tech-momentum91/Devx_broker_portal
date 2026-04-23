@@ -19,6 +19,7 @@ import {
   getCityOptionsForLeadForm,
   getClientCompanyOptionsForLeadForm,
 } from '@/services/dashboard-service';
+import { BROKER_SUBMIT_LEAD_ERROR_FALLBACK } from '@/services/lead-submit-service';
 import { showErrorToast } from '@/utils/error-utils';
 
 const DEAL_SITUATION_OPTIONS = [
@@ -225,7 +226,7 @@ const DesignBuildLeadForm = ({ initialData = null }) => {
 
   useEffect(() => {
     if (submitStatus === 'failed' && submitError) {
-      showErrorToast(submitError, { defaultMessage: 'Failed to submit lead.' });
+      showErrorToast(submitError, { defaultMessage: BROKER_SUBMIT_LEAD_ERROR_FALLBACK });
     }
   }, [submitStatus, submitError]);
 
@@ -692,11 +693,7 @@ const DesignBuildLeadForm = ({ initialData = null }) => {
 
         {/* Submit */}
         <div className="flex flex-col items-end gap-2 pt-2">
-          {submitError && (
-            <p className="text-paragraph-sm text-error-500" role="alert">
-              {submitError}
-            </p>
-          )}
+        
           <Button.Root
             variant="primary"
             mode="filled"

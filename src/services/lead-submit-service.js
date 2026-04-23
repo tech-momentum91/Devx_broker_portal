@@ -4,6 +4,69 @@
  */
 
 import apiClient from '@/api/axios';
+import { extractErrorMessage } from '@/utils/error-utils';
+
+/** User-facing copy when Frappe returns tracebacks or unreadable payloads (matches main app tone). */
+export const BROKER_SUBMIT_LEAD_ERROR_FALLBACK = 'Unable to create lead. Please try again.';
+
+/** Remove `frappe.exceptions.ValidationError:` / `ValidationError:` style prefixes (not for brokers). */
+function stripPythonExceptionPrefix(msg) {
+  if (!msg || typeof msg !== 'string') return msg;
+  let s = msg.trim();
+  s = s.replace(/^frappe\.exceptions\.\w+\s*:\s*/i, '').trim();
+  s = s.replace(/^builtins\.\w+\s*:\s*/i, '').trim();
+  s = s.replace(/^[A-Z][a-zA-Z0-9_]*Error\s*:\s*/, '').trim();
+  return s;
+}
+
+/**
+ * Short, single-line message for submit-lead failures (toast + inline alert).
+ * @param {unknown} data - Frappe `response.data`, a thrown message string, or an axios-like `{ response }`
+ */
+export function getShortSubmitLeadErrorMessage(input) {
+  if (input == null || input === '') {
+    return BROKER_SUBMIT_LEAD_ERROR_FALLBACK;
+  }
+  if (typeof input === 'number' || typeof input === 'boolean') {
+    return BROKER_SUBMIT_LEAD_ERROR_FALLBACK;
+  }
+
+  const shaped =
+    typeof input === 'string'
+      ? input
+      : typeof input === 'object' && input !== null
+        ? input
+        : BROKER_SUBMIT_LEAD_ERROR_FALLBACK;
+
+  const raw = extractErrorMessage(shaped, BROKER_SUBMIT_LEAD_ERROR_FALLBACK);
+  let s = String(raw || BROKER_SUBMIT_LEAD_ERROR_FALLBACK)
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  s = stripPythonExceptionPrefix(s);
+
+  // Internal CRM validation — do not show on broker submit UI (address in CRM / broker API).
+  if (/pipeline\s+is\s+required/i.test(s) && s.length <= 80) {
+    return BROKER_SUBMIT_LEAD_ERROR_FALLBACK;
+  }
+
+  if (
+    s.includes('Traceback (most recent call last)') ||
+    s.includes('Traceback (most recent call)') ||
+    (s.length > 400 && s.includes('File "'))
+  ) {
+    return BROKER_SUBMIT_LEAD_ERROR_FALLBACK;
+  }
+  if (s.length > 180) {
+    return `${s.slice(0, 177)}…`;
+  }
+  return s || BROKER_SUBMIT_LEAD_ERROR_FALLBACK;
+}
 
 /**
  * CRM Lead Product options for Manage Office workspace dropdown (CRM Lead.product Link).
@@ -16,15 +79,6 @@ export async function getCrmLeadProductsForBrokerPortal() {
   );
   const msg = response?.data?.message;
   return Array.isArray(msg) ? msg : [];
-}
-
-function extractErrorMessage(body) {
-  if (!body) return '';
-  if (typeof body === 'string') return body;
-  if (typeof body?.message === 'string') return body.message;
-  if (typeof body?.exc === 'string') return body.exc;
-  if (typeof body?._server_messages === 'string') return body._server_messages;
-  return '';
 }
 
 /**
@@ -60,21 +114,13 @@ export async function submitLeadFromBrokerPortal(payload) {
     data?.status === 'error';
 
   if (hasExplicitFailure) {
-    throw new Error(
-      extractErrorMessage(data) ||
-      extractErrorMessage(messagePayload) ||
-      'Failed to submit lead',
-    );
+    throw new Error(getShortSubmitLeadErrorMessage(data ?? messagePayload));
   }
 
   // Some Frappe responses return 200 even when operation fails.
   // If we do not get a lead name, treat it as failure so UI can show error.
   if (!leadName) {
-    throw new Error(
-      extractErrorMessage(data) ||
-      extractErrorMessage(messagePayload) ||
-      'Lead was not created. Please try again.',
-    );
+    throw new Error(getShortSubmitLeadErrorMessage(data ?? messagePayload));
   }
   return {
     name: leadName,

@@ -18,7 +18,10 @@ import {
   getCityOptionsForLeadForm,
   getClientCompanyOptionsForLeadForm,
 } from '@/services/dashboard-service';
-import { getCrmLeadProductsForBrokerPortal } from '@/services/lead-submit-service';
+import {
+  getCrmLeadProductsForBrokerPortal,
+  BROKER_SUBMIT_LEAD_ERROR_FALLBACK,
+} from '@/services/lead-submit-service';
 import { showErrorToast } from '@/utils/error-utils';
 
 const COWORKING_PRODUCTS = [
@@ -239,7 +242,7 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
 
   useEffect(() => {
     if (submitStatus === 'failed' && submitError) {
-      showErrorToast(submitError, { defaultMessage: 'Failed to submit lead.' });
+      showErrorToast(submitError, { defaultMessage: BROKER_SUBMIT_LEAD_ERROR_FALLBACK });
     }
   }, [submitStatus, submitError]);
 
@@ -566,12 +569,7 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
           </FieldGroup>
         </div>
 
-        {/* Submit error */}
-        {submitError && (
-          <p className="text-paragraph-sm text-error-500" role="alert">
-            {submitError}
-          </p>
-        )}
+      
 
         {/* Submit */}
         <div className="flex justify-end pt-2">

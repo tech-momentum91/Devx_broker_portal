@@ -6,7 +6,7 @@ function LoginCardHeader() {
     <div className='w-full justify-between flex pt-[24px]'>
       <img src={logo} alt='logo' />
 
-      <NeedHelp />
+      {/* <NeedHelp /> */}
     </div>
   );
 }
