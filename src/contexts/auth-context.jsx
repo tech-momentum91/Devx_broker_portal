@@ -42,6 +42,8 @@ export const AuthProvider = ({ children }) => {
   const [sessionApiSucceeded, setSessionApiSucceeded] = useState(false);
   const [sessionApiError, setSessionApiError] = useState(false);
   const initialCheckRef = useRef(false);
+  /** Latest auth flags for silent revalidation (avoid full-screen loader on every route mount). */
+  const sessionOkRef = useRef({ isAuthenticated: false, sessionApiSucceeded: false });
 
   const persistUser = useCallback((userData, fallbackEmail) => {
     if (!userData) return null;
@@ -118,8 +120,12 @@ export const AuthProvider = ({ children }) => {
     });
   }, [dispatch]);
 
+  useEffect(() => {
+    sessionOkRef.current = { isAuthenticated, sessionApiSucceeded };
+  }, [isAuthenticated, sessionApiSucceeded]);
+
   const checkAuth = useCallback(
-    async (force = false) => {
+    async (force = false, options = {}) => {
       if (initialCheckRef.current && !force) {
         return;
       }
@@ -128,9 +134,17 @@ export const AuthProvider = ({ children }) => {
         initialCheckRef.current = true;
       }
 
-      setLoading(true);
-      setSessionApiSucceeded(false);
-      setSessionApiError(false);
+      const silent =
+        Boolean(options.silent) &&
+        force &&
+        sessionOkRef.current.isAuthenticated &&
+        sessionOkRef.current.sessionApiSucceeded;
+
+      if (!silent) {
+        setLoading(true);
+        setSessionApiSucceeded(false);
+        setSessionApiError(false);
+      }
       try {
         // Check if there's a valid session on the server
         const session = await getSession();
@@ -187,14 +201,21 @@ export const AuthProvider = ({ children }) => {
           logout();
         }
       } finally {
-        setLoading(false);
+        if (!silent) {
+          setLoading(false);
+        }
       }
     },
     [logout, persistUser, syncUserFromStorage, dispatch],
   );
 
-  const refreshSession = useCallback(() => {
-    checkAuth(true);
+  /**
+   * @param {{ silent?: boolean }} [options] - When `silent` is true and the user already passed a
+   *   successful session check, revalidate in the background without the global loading screen
+   *   (fixes route changes like dashboard → submit-lead feeling like they need a second click).
+   */
+  const refreshSession = useCallback((options = {}) => {
+    checkAuth(true, options);
   }, [checkAuth]);
 
   // Note: checkAuth() is no longer called automatically on mount

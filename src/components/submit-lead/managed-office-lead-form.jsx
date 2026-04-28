@@ -51,6 +51,9 @@ const managedOfficeSchema = z
     workspaceType: z.string().trim().min(1, 'Workspace Requirement Type is required.'),
     productType: z.string().trim().optional(),
     seats: z.string().trim().min(1, 'Number of Seats is required.'),
+    contactPerson: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+    email: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
     const wt = (data.workspaceType || '').toLowerCase();
@@ -59,6 +62,24 @@ const managedOfficeSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Product Type is required for Coworking workspace.',
         path: ['productType'],
+      });
+    }
+
+    const hasContactPerson = Boolean((data.contactPerson || '').trim());
+    if (!hasContactPerson) return;
+
+    if (!(data.phone || '').trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Phone is required when Contact Person is provided.',
+        path: ['phone'],
+      });
+    }
+    if (!(data.email || '').trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Email is required when Contact Person is provided.',
+        path: ['email'],
       });
     }
   });
@@ -145,6 +166,7 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
   const selectedWorkspaceLabel =
     workspaceProductOptions.find((o) => o.value === workspaceType)?.label ?? '';
   const showProductType = selectedWorkspaceLabel.toLowerCase().includes('coworking');
+  const contactPersonProvided = Boolean(contactPerson.trim());
 
   useEffect(() => {
     dispatch(resetSubmitState());
@@ -259,6 +281,9 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
       workspaceType: trimmedWorkspaceType,
       productType: trimmedProductType,
       seats: trimmedSeats,
+      contactPerson: contactPerson.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
     });
     if (!validation.success) {
       setValidationErrors(getFieldErrorsFromIssues(validation.error.issues));
@@ -503,36 +528,51 @@ const ManagedOfficeLeadForm = ({ initialData = null }) => {
                     type="text"
                     placeholder="e.g. Anita Sharma"
                     value={contactPerson}
-                    onChange={(e) => setContactPerson(e.target.value)}
+                    onChange={(e) => {
+                      setContactPerson(e.target.value);
+                      setValidationErrors((prev) => ({
+                        ...prev,
+                        phone: undefined,
+                        email: undefined,
+                      }));
+                    }}
                   />
                 </Input.Wrapper>
               </Input.Root>
             </FieldGroup>
 
-            <FieldGroup label="Phone">
-              <Input.Root className={inputRootClass}>
+            <FieldGroup label="Phone" required={contactPersonProvided}>
+              <Input.Root className={inputRootClass} hasError={Boolean(validationErrors.phone)}>
                 <Input.Wrapper>
                   <Input.Input
                     type="tel"
                     placeholder="+91 98765 43210"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setValidationErrors((prev) => ({ ...prev, phone: undefined }));
+                    }}
                   />
                 </Input.Wrapper>
               </Input.Root>
+              <ErrorText>{validationErrors.phone}</ErrorText>
             </FieldGroup>
 
-            <FieldGroup label="Email">
-              <Input.Root className={inputRootClass}>
+            <FieldGroup label="Email" required={contactPersonProvided}>
+              <Input.Root className={inputRootClass} hasError={Boolean(validationErrors.email)}>
                 <Input.Wrapper>
                   <Input.Input
                     type="email"
                     placeholder="contact@company.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setValidationErrors((prev) => ({ ...prev, email: undefined }));
+                    }}
                   />
                 </Input.Wrapper>
               </Input.Root>
+              <ErrorText>{validationErrors.email}</ErrorText>
             </FieldGroup>
 
             <div className="md:col-span-2">

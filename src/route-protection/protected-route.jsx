@@ -27,15 +27,9 @@ const ProtectedRoute = ({ children, requireAuth = true }) => {
   } = useAuth();
   const location = useLocation();
 
-  // Trigger session check when component mounts (only for routes that use ProtectedRoute)
-  // Only check if we haven't checked yet to avoid unnecessary API calls
   useEffect(() => {
-    // Only trigger check if we haven't checked yet
-    // sessionApiSucceeded will be false if we haven't checked, or if the check failed
-    // We still want to check even if it failed (to retry), but not if it succeeded
-    // Actually, we should check on every protected route mount to ensure session is valid
-    // But checkAuth has a guard to prevent multiple simultaneous calls
-    refreshSession();
+    // Revalidate on mount; silent when already verified so navigation (e.g. to submit-lead) does not show a full-screen loader.
+    refreshSession({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once per route mount
 
